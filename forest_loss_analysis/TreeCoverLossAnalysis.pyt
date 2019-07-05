@@ -184,15 +184,16 @@ class Tool(object):
                     output_file.write(str(gid) + "\t" + wkb + "\n")
 
         # Upload inout features to S3
-
-    #    s3 = boto3.resource("s3")
-    #    s3.meta.client.upload_file(
-    #        output_file, "gfw-files", "2018_updates/csv", "input_features.tsv"
-    #    )
+		
+        messages.addMessage("Upload to S3")
+        s3 = boto3.resource("s3")
+        s3.meta.client.upload_file(
+            r"C:\ForestAtlas\outfile.tsv", "gfw-files", "2018_updates/tsv/input_features.tsv"
+        )
 
         # config spark cluster
         # start job
-        # self._laucn_emr("S3://gfw-files/2018_updates/csv/input_features.tsv", tcd)
+        # self._laucn_emr("S3://gfw-files/2018_updates/tsv/input_features.tsv", tcd)
 
         return
 
