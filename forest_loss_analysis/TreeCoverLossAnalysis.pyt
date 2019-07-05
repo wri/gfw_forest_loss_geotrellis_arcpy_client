@@ -194,7 +194,7 @@ class Tool(object):
 
         return
 
-    def _launch_emr(self, instance_type, instance_count, in_features, tcd):
+    def _launch_emr(self, in_features, tcd, instance_type="m3.2xlarge", instance_count=20):
 
         client = boto3.client("emr")
         response = client.run_job_flow(
@@ -224,7 +224,7 @@ class Tool(object):
                                 {
                                     "VolumeSpecification": {
                                         "VolumeType": "gp2",
-                                        "SizeInGB": 30,
+                                        "SizeInGB": 10,
                                     },
                                     "VolumesPerInstance": 1,
                                 }
@@ -244,7 +244,7 @@ class Tool(object):
                                 {
                                     "VolumeSpecification": {
                                         "VolumeType": "gp2",
-                                        "SizeInGB": 30,
+                                        "SizeInGB": 10,
                                     },
                                     "VolumesPerInstance": 1,
                                 }
@@ -307,13 +307,13 @@ class Tool(object):
                         "spark.driver.maxResultSize": "3G",
                         "spark.rdd.compress": "true",
                         "spark.executor.cores": "1",
-                        "spark.sql.shuffle.partitions": "13390",
+                        "spark.sql.shuffle.partitions": "1390",
                         "spark.shuffle.spill.compress": "true",
                         "spark.shuffle.compress": "true",
-                        "spark.default.parallelism": "13390",
+                        "spark.default.parallelism": "1390",
                         "spark.shuffle.service.enabled": "true",
                         "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                        "spark.executor.instances": "1339",
+                        "spark.executor.instances": "139",
                         "spark.yarn.executor.memoryOverhead": "1G",
                         "spark.dynamicAllocation.enabled": "false",
                         "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
