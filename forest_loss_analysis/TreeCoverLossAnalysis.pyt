@@ -118,6 +118,8 @@ class Tool(object):
         in_features = parameters[0].valueAsText
         arcpy.MakeFeatureLayer_management(in_features, "in_features")
 
+        tcd = parameters[1].value
+
         sr = arcpy.SpatialReference(4326)
         fishnet_path = r"in_memory\fishnet"
         out_features_path = parameters[5].valueAsText
@@ -190,7 +192,7 @@ class Tool(object):
 
         # config spark cluster
         # start job
-        # self._laucn_emr
+        # self._laucn_emr("S3://gfw-files/2018_updates/csv/input_features.tsv", tcd)
 
         return
 
