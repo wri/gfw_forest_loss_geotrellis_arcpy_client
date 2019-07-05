@@ -4,7 +4,7 @@ import boto3
 import itertools
 
 
-class TreeCoverLossAnalysis(object):
+class Toolbox(object):
     def __init__(self):
         """Define the toolbox (the name of the toolbox is the name of the
         .pyt file)."""
@@ -39,20 +39,22 @@ class Tool(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input",
-            default=[30],
+           # default=[30],
             multiValue=True,
         )
         # Set a value list of 1, 10 and 100
 
         tcd.filter.type = "ValueList"
         tcd.filter.list = list(range(0, 100, 5))
+        tcd.value = 30
 
         slack_user = arcpy.Parameter(
             displayName="Slack user name",
             name="slack_user",
             datatype="GPString",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Input",
+			category="Notifications",
         )
 
         slack_user.filter.type = "ValueList"
@@ -64,9 +66,10 @@ class Tool(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input",
-            default=4,
             category="Spark config",
         )
+		
+        nb_workers.value = 4
 
         instance_type = arcpy.Parameter(
             displayName="Instance Parameter",
@@ -74,14 +77,23 @@ class Tool(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input",
-            default="m3.2xlarge",
             category="Spark config",
         )
 
-        tcd.filter.type = "ValueList"
-        tcd.filter.list = ["m3.2xlarge"]
+        instance_type.filter.type = "ValueList"
+        instance_type.list = ["m3.2xlarge"]
+        instance_type.value = "m3.2xlarge"
+		
+        out_features = arcpy.Parameter(
+            displayName="Out features",
+            name="out_features",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Output")
+		
+        out_features.value = r"in_memory\out_features"
 
-        params = [in_features, tcd, slack_user, nb_workers, instance_type]
+        params = [in_features, tcd, slack_user, nb_workers, instance_type, out_features]
 
         return params
 
@@ -103,12 +115,17 @@ class Tool(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
 
-        in_features = parameters[0]
+        in_features = parameters[0].valueAsText
+        arcpy.MakeFeatureLayer_management(in_features, "in_features")
+		
+        sr = arcpy.SpatialReference(4326)
+        fishnet_path = r"in_memory\fishnet"
+        out_features_path = parameters[5].valueAsText
 
         # Create fishnet
         messages.addMessage("Compute in memory fishnet")
         arcpy.CreateFishnet_management(
-            r"in_memory\fishnet",
+            fishnet_path,
             "-180 -90",
             "-180, 90",
             1,
@@ -119,43 +136,61 @@ class Tool(object):
             template=arcpy.Extent(-180, -90, 180, 90),
             geometry_type="POLYGON",
         )
-
+        messages.addMessage("Define Projection for Fishnet")
+        arcpy.DefineProjection_management(fishnet_path, sr)
+		
+        arcpy.MakeFeatureLayer_management(fishnet_path, "fishnet")
+        
         # intersect input feature with fishnet and forest loss extent
+        messages.addMessage("Load Loss Extent")
+        loss_extent_geom = arcpy.AsShape(self.loss_extent, False)
+        arcpy.CreateFeatureclass_management("in_memory" , "loss_extent", "POLYGON", spatial_reference=sr)
+		
+        cursor = arcpy.da.InsertCursor(r"in_memory\loss_extent", ["SHAPE@"])
+        cursor.insertRow([loss_extent_geom])
+		
+      #  messages.addMessage("Define Projection for Loss Extent")
+      #  arcpy.DefineProjection_management(loss_extent, sr)
+		#
+        arcpy.MakeFeatureLayer_management(r"in_memory\loss_extent", "loss_extent")
+    #    arcpy.Copy_management(loss_proj,out_features_path)
 
-        loss_extent = arcpy.AsShape(self.loss_extent, False)
-        sr = arcpy.SpatialReference(4326)
-        arcpy.DefineProjection_management(loss_extent, sr)
-
+        messages.addMessage("Intersect layers")
         arcpy.Intersect_analysis(
-            [in_features, 2],
-            [r"in_memory\fishnet", 1],
-            [loss_extent, 1],
-            r"in_memory\out_features",
-            join_attributes="ONLY_FID",
-        )
+            in_features="in_features 3;loss_extent 1; fishnet 2", 
+            out_feature_class=out_features_path, 
+            join_attributes="ONLY_FID", 
+            cluster_tolerance="-1 Unknown", 
+            output_type="INPUT")
 
         # Export to WKB
 
-        with ("outfile.tsv", "a+") as output_file:
+        id_field = None
+        fields = arcpy.ListFields(out_features_path, field_type = "Integer")
+        for field in fields:
+            if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
+                id_field = field.name
+		
+        with open(r"C:\ForestAtlas\outfile.tsv", "a+") as output_file:
 
             with arcpy.da.SearchCursor(
-                r"in_memory\out_features", ["OID@", "SHAPE@WKB"]
+                r"in_memory\out_features", [id_field, "SHAPE@WKB"]
             ) as cursor:
                 for row in cursor:
                     gid = row[0]
                     wkb = binascii.hexlify(row[1])
-                    output_file.write(gid + "\t" + wkb + "\n")
+                    output_file.write(str(gid) + "\t" + wkb + "\n")
 
         # Upload inout features to S3
 
-        s3 = boto3.resource("s3")
-        s3.meta.client.upload_file(
-            output_file, "gfw-files", "2018_updates/csv", "input_features.tsv"
-        )
+    #    s3 = boto3.resource("s3")
+    #    s3.meta.client.upload_file(
+    #        output_file, "gfw-files", "2018_updates/csv", "input_features.tsv"
+    #    )
 
         # config spark cluster
         # start job
-        self._laucn_emr
+        # self._laucn_emr
 
         return
 
