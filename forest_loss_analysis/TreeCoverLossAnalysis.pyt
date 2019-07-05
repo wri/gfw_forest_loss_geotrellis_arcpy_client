@@ -68,7 +68,7 @@ class Tool(object):
             direction="Input",
             category="Spark config",
         )
-		
+
         nb_workers.value = 4
 
         instance_type = arcpy.Parameter(
@@ -83,14 +83,14 @@ class Tool(object):
         instance_type.filter.type = "ValueList"
         instance_type.list = ["m3.2xlarge"]
         instance_type.value = "m3.2xlarge"
-		
+
         out_features = arcpy.Parameter(
             displayName="Out features",
             name="out_features",
             datatype="GPFeatureLayer",
             parameterType="Required",
             direction="Output")
-		
+
         out_features.value = r"in_memory\out_features"
 
         params = [in_features, tcd, slack_user, nb_workers, instance_type, out_features]
@@ -117,7 +117,7 @@ class Tool(object):
 
         in_features = parameters[0].valueAsText
         arcpy.MakeFeatureLayer_management(in_features, "in_features")
-		
+
         sr = arcpy.SpatialReference(4326)
         fishnet_path = r"in_memory\fishnet"
         out_features_path = parameters[5].valueAsText
@@ -138,17 +138,17 @@ class Tool(object):
         )
         messages.addMessage("Define Projection for Fishnet")
         arcpy.DefineProjection_management(fishnet_path, sr)
-		
+
         arcpy.MakeFeatureLayer_management(fishnet_path, "fishnet")
-        
+
         # intersect input feature with fishnet and forest loss extent
         messages.addMessage("Load Loss Extent")
         loss_extent_geom = arcpy.AsShape(self.loss_extent, False)
         arcpy.CreateFeatureclass_management("in_memory" , "loss_extent", "POLYGON", spatial_reference=sr)
-		
+
         cursor = arcpy.da.InsertCursor(r"in_memory\loss_extent", ["SHAPE@"])
         cursor.insertRow([loss_extent_geom])
-		
+
       #  messages.addMessage("Define Projection for Loss Extent")
       #  arcpy.DefineProjection_management(loss_extent, sr)
 		#
@@ -157,10 +157,10 @@ class Tool(object):
 
         messages.addMessage("Intersect layers")
         arcpy.Intersect_analysis(
-            in_features="in_features 3;loss_extent 1; fishnet 2", 
-            out_feature_class=out_features_path, 
-            join_attributes="ONLY_FID", 
-            cluster_tolerance="-1 Unknown", 
+            in_features="in_features 3;loss_extent 1; fishnet 2",
+            out_feature_class=out_features_path,
+            join_attributes="ONLY_FID",
+            cluster_tolerance="-1 Unknown",
             output_type="INPUT")
 
         # Export to WKB
@@ -170,7 +170,7 @@ class Tool(object):
         for field in fields:
             if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
                 id_field = field.name
-		
+
         with open(r"C:\ForestAtlas\outfile.tsv", "a+") as output_file:
 
             with arcpy.da.SearchCursor(
@@ -276,14 +276,14 @@ class Tool(object):
                     "ActionOnFailure": "TERMINATE_CLUSTER",
                     "HadoopJarStep": {
                         "Properties": [{"Key": "string", "Value": "string"}],
-                        "Jar": "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.2.jar",
+                        "Jar": "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
                         "MainClass": "org.globalforestwatch.treecoverloss.TreeCoverLossSummaryMain",
                         "Args": [
                             "--features",
                             in_features,
                             "--output s3://gfw-files/2018_update/results",
                         ]
-                        + list(zip(itertools.repeat("--tcd"), [i for i in tcd])),
+                        + list(zip(itertools.repeat("--threshold"), [i for i in tcd])),
                     },
                 }
             ],
