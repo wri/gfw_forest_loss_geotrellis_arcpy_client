@@ -92,7 +92,7 @@ class Tool(object):
             category="Spark config",
         )
 
-        instance_count.value = 20
+        instance_count.value = 4
 
         # out_features = arcpy.Parameter(
         #     displayName="Out features",
