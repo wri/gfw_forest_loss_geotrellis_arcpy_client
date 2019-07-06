@@ -256,13 +256,6 @@ class Tool(object):
                         "InstanceRole": "MASTER",
                         "InstanceType": instance_type,
                         "InstanceCount": 1,
-                        "Configurations": [
-                            {
-                                "Classification": "string",
-                                "Configurations": {"... recursive ..."},
-                                "Properties": {"string": "string"},
-                            }
-                        ],
                         "EbsConfiguration": {
                             "EbsBlockDeviceConfigs": [
                                 {
@@ -280,7 +273,7 @@ class Tool(object):
                         "Name": "geotrellis-treecoverloss-cores",
                         "Market": "SPOT",
                         "InstanceRole": "CORE",
-                        "BidPrice": None,
+                        "BidPrice": "NULL",
                         "InstanceType": instance_type,
                         "InstanceCount": instance_count,
                         "EbsConfiguration": {
@@ -340,7 +333,7 @@ class Tool(object):
                 {
                     "classification": "spark",
                     "properties": {"maximizeResourceAllocation": "true"},
-                    "configurations": [],
+                   # "configurations": [],
                 },
                 {
                     "classification": "spark-defaults",
@@ -368,7 +361,7 @@ class Tool(object):
                         "spark.dynamicAllocation.enabled": "false",
                         "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                     },
-                    "configurations": [],
+                   # "configurations": [],
                 },
                 {
                     "classification": "yarn-site",
@@ -377,7 +370,7 @@ class Tool(object):
                         "yarn.resourcemanager.am.max-attempts": "1",
                         "yarn.nodemanager.vmem-check-enabled": "false",
                     },
-                    "configurations": [],
+                  #  "configurations": [],
                 },
             ],
             VisibleToAllUsers=True,
