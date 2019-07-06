@@ -138,7 +138,7 @@ class Tool(object):
         arcpy.env.overwriteOutput = True
 
         in_features = parameters[0].valueAsText
-        tcd = parameters[1].value
+        tcd = parameters[1].values
         instance_type = parameters[2].value
         instance_count = parameters[3].value
         # self.out_features_path = parameters[4].valueAsText
