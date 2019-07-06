@@ -2,7 +2,6 @@ import arcpy
 import binascii
 import boto3
 import itertools
-import os
 
 
 class Toolbox(object):
