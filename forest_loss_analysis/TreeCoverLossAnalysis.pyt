@@ -2,6 +2,7 @@ import arcpy
 import binascii
 import boto3
 import itertools
+import os
 
 
 class Toolbox(object):
@@ -39,7 +40,7 @@ class Tool(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input",
-           # default=[30],
+            # default=[30],
             multiValue=True,
         )
         # Set a value list of 1, 10 and 100
@@ -54,7 +55,7 @@ class Tool(object):
             datatype="GPString",
             parameterType="Optional",
             direction="Input",
-			category="Notifications",
+            category="Notifications",
         )
 
         slack_user.filter.type = "ValueList"
@@ -89,11 +90,19 @@ class Tool(object):
             name="out_features",
             datatype="GPFeatureLayer",
             parameterType="Required",
-            direction="Output")
+            direction="Output",
+        )
 
         out_features.value = r"in_memory\out_features"
 
-        params = [in_features, tcd, slack_user, instance_type, instance_count, out_features]
+        params = [
+            in_features,
+            tcd,
+            slack_user,
+            instance_type,
+            instance_count,
+            out_features,
+        ]
 
         return params
 
@@ -122,10 +131,15 @@ class Tool(object):
 
         instance_type = parameters[3].value
         instance_count = parameters[4].value
+        out_features_path = parameters[5].valueAsText
 
         sr = arcpy.SpatialReference(4326)
+
         fishnet_path = r"in_memory\fishnet"
-        out_features_path = parameters[5].valueAsText
+        loss_extent_path = r"in_memory\loss_extent"
+        tsv_file = "treecoverloss.tsv"
+        tsv_s3_folder = "2018_updates/tsv"
+        tsv_s3_bucket = "gfw-files"
 
         # Create fishnet
         messages.addMessage("Compute in memory fishnet")
@@ -149,16 +163,18 @@ class Tool(object):
         # intersect input feature with fishnet and forest loss extent
         messages.addMessage("Load Loss Extent")
         loss_extent_geom = arcpy.AsShape(self.loss_extent, False)
-        arcpy.CreateFeatureclass_management("in_memory" , "loss_extent", "POLYGON", spatial_reference=sr)
+        arcpy.CreateFeatureclass_management(
+            "in_memory", "loss_extent", "POLYGON", spatial_reference=sr
+        )
 
-        cursor = arcpy.da.InsertCursor(r"in_memory\loss_extent", ["SHAPE@"])
+        cursor = arcpy.da.InsertCursor(loss_extent_path, ["SHAPE@"])
         cursor.insertRow([loss_extent_geom])
 
-      #  messages.addMessage("Define Projection for Loss Extent")
-      #  arcpy.DefineProjection_management(loss_extent, sr)
-		#
-        arcpy.MakeFeatureLayer_management(r"in_memory\loss_extent", "loss_extent")
-    #    arcpy.Copy_management(loss_proj,out_features_path)
+        #  messages.addMessage("Define Projection for Loss Extent")
+        #  arcpy.DefineProjection_management(loss_extent, sr)
+        #
+        arcpy.MakeFeatureLayer_management(loss_extent_path, "loss_extent")
+        #    arcpy.Copy_management(loss_proj,out_features_path)
 
         messages.addMessage("Intersect layers")
         arcpy.Intersect_analysis(
@@ -166,20 +182,21 @@ class Tool(object):
             out_feature_class=out_features_path,
             join_attributes="ONLY_FID",
             cluster_tolerance="-1 Unknown",
-            output_type="INPUT")
+            output_type="INPUT",
+        )
 
         # Export to WKB
 
         id_field = None
-        fields = arcpy.ListFields(out_features_path, field_type = "Integer")
+        fields = arcpy.ListFields(out_features_path, field_type="Integer")
         for field in fields:
             if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
                 id_field = field.name
 
-        with open(r"C:\ForestAtlas\outfile.tsv", "a+") as output_file:
+        with open(tsv_file, "a+") as output_file:
 
             with arcpy.da.SearchCursor(
-                r"in_memory\out_features", [id_field, "SHAPE@WKB"]
+                out_features_path, [id_field, "SHAPE@WKB"]
             ) as cursor:
                 for row in cursor:
                     gid = row[0]
@@ -188,18 +205,32 @@ class Tool(object):
 
         # Upload inout features to S3
 
-    #    s3 = boto3.resource("s3")
-    #    s3.meta.client.upload_file(
-    #        output_file, "gfw-files", "2018_updates/csv", "input_features.tsv"
-    #    )
+        messages.addMessage("Upload to S3")
+        s3 = boto3.resource("s3")
+        s3.meta.client.upload_file(
+            tsv_file, tsv_s3_bucket, "{}/{}".format(tsv_s3_folder, tsv_file)
+        )
 
         # config spark cluster
-        # start job
-        # self._laucn_emr("S3://gfw-files/2018_updates/csv/input_features.tsv", tcd)
+        messages.addMessage("Start Cluster")
+        cluster = self._launch_emr(
+            "s3://{}/{}/{}".format(tsv_s3_bucket, tsv_s3_folder, tsv_file),
+            tcd,
+            instance_type,
+            instance_count,
+        )
+
+        messages.addMessage(cluster)
+
+        messages.addMessage(
+            "DONE - check AWS EMR for cluster status and AWS S3 folder for results"
+        )
 
         return
 
-    def _launch_emr(self, in_features, tcd, instance_type="m3.2xlarge", instance_count=20):
+    def _launch_emr(
+        self, in_features, tcd, instance_type="m3.2xlarge", instance_count=20
+    ):
 
         client = boto3.client("emr")
         response = client.run_job_flow(
@@ -312,13 +343,19 @@ class Tool(object):
                         "spark.driver.maxResultSize": "3G",
                         "spark.rdd.compress": "true",
                         "spark.executor.cores": "1",
-                        "spark.sql.shuffle.partitions": "{}".format((70 * instance_count) - 1),
+                        "spark.sql.shuffle.partitions": "{}".format(
+                            (70 * instance_count) - 1
+                        ),
                         "spark.shuffle.spill.compress": "true",
                         "spark.shuffle.compress": "true",
-                        "spark.default.parallelism": "{}".format((70 * instance_count) - 1),
+                        "spark.default.parallelism": "{}".format(
+                            (70 * instance_count) - 1
+                        ),
                         "spark.shuffle.service.enabled": "true",
                         "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                        "spark.executor.instances": "{}".format((7 * instance_count) - 1),
+                        "spark.executor.instances": "{}".format(
+                            (7 * instance_count) - 1
+                        ),
                         "spark.yarn.executor.memoryOverhead": "1G",
                         "spark.dynamicAllocation.enabled": "false",
                         "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
