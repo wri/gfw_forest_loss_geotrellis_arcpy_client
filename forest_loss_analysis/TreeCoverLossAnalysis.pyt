@@ -60,17 +60,6 @@ class Tool(object):
         slack_user.filter.type = "ValueList"
         slack_user.filter.list = ["David Gibbs", "liz.goldman", "thai", "thomas"]
 
-        nb_workers = arcpy.Parameter(
-            displayName="Number of workers",
-            name="nb_workers",
-            datatype="GPLong",
-            parameterType="Required",
-            direction="Input",
-            category="Spark config",
-        )
-
-        nb_workers.value = 4
-
         instance_type = arcpy.Parameter(
             displayName="Instance Parameter",
             name="instance_parameter",
@@ -84,6 +73,17 @@ class Tool(object):
         instance_type.list = ["m3.2xlarge"]
         instance_type.value = "m3.2xlarge"
 
+        instance_count = arcpy.Parameter(
+            displayName="Number of workers",
+            name="instance_count",
+            datatype="GPLong",
+            parameterType="Required",
+            direction="Input",
+            category="Spark config",
+        )
+
+        instance_count.value = 20
+
         out_features = arcpy.Parameter(
             displayName="Out features",
             name="out_features",
@@ -93,7 +93,7 @@ class Tool(object):
 
         out_features.value = r"in_memory\out_features"
 
-        params = [in_features, tcd, slack_user, nb_workers, instance_type, out_features]
+        params = [in_features, tcd, slack_user, instance_type, instance_count, out_features]
 
         return params
 
@@ -119,6 +119,9 @@ class Tool(object):
         arcpy.MakeFeatureLayer_management(in_features, "in_features")
 
         tcd = parameters[1].value
+
+        instance_type = parameters[3].value
+        instance_count = parameters[4].value
 
         sr = arcpy.SpatialReference(4326)
         fishnet_path = r"in_memory\fishnet"
@@ -309,13 +312,13 @@ class Tool(object):
                         "spark.driver.maxResultSize": "3G",
                         "spark.rdd.compress": "true",
                         "spark.executor.cores": "1",
-                        "spark.sql.shuffle.partitions": "1390",
+                        "spark.sql.shuffle.partitions": "{}".format((70 * instance_count) - 1),
                         "spark.shuffle.spill.compress": "true",
                         "spark.shuffle.compress": "true",
-                        "spark.default.parallelism": "1390",
+                        "spark.default.parallelism": "{}".format((70 * instance_count) - 1),
                         "spark.shuffle.service.enabled": "true",
                         "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                        "spark.executor.instances": "139",
+                        "spark.executor.instances": "{}".format((7 * instance_count) - 1),
                         "spark.yarn.executor.memoryOverhead": "1G",
                         "spark.dynamicAllocation.enabled": "false",
                         "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
