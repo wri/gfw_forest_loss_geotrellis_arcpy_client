@@ -240,7 +240,7 @@ class Tool(object):
     def _launch_emr(self, in_features, tcd, instance_type, instance_count, messages):
 
         messages.addMessage("Start Cluster")
-        client = boto3.client("emr", region_name='us-east-1')
+        client = boto3.client("emr", region_name="us-east-1")
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
             LogUri="s3://gfw-files/2018_update/spark/logs",
@@ -273,7 +273,7 @@ class Tool(object):
                         "Name": "geotrellis-treecoverloss-cores",
                         "Market": "SPOT",
                         "InstanceRole": "CORE",
-                        #"BidPrice": "0.532",
+                        # "BidPrice": "0.532",
                         "InstanceType": instance_type,
                         "InstanceCount": instance_count,
                         "EbsConfiguration": {
@@ -296,39 +296,50 @@ class Tool(object):
                 "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
                 "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
                 "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
-               # "ServiceAccessSecurityGroup": "string",
+                # "ServiceAccessSecurityGroup": "string",
                 "AdditionalMasterSecurityGroups": [
                     "sg-d7a0d8ad",
                     "sg-001e5f904c9cb7cc4",
                     "sg-6c6a5911",
                 ],
-                "AdditionalSlaveSecurityGroups": [ 
-                    "sg-d7a0d8ad",
-                    "sg-6c6a5911",],
+                "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
             },
             Steps=[
                 {
                     "Name": "treecoverloss-analysis",
                     "ActionOnFailure": "TERMINATE_CLUSTER",
                     "HadoopJarStep": {
-                        #"Properties": [{"Key": "string", "Value": "string"}],
-                        "Jar": "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
-                        "MainClass": "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
+                        # "Properties": [{"Key": "string", "Value": "string"}],
+                        "Jar": "command-runner.jar",
+                        # "MainClass": "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
                         "Args": [
+                            "spark-submit",
+                            "--deploy-modecluster",
+                            "--class",
+                            "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
+                            "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
                             "--features",
                             in_features,
                             "--output",
                             "s3://gfw-files/2018_update/results",
                         ]
-                        + [item for sublist in list(map(list, zip(itertools.repeat("--threshold"), [str(i) for i in tcd]))) for item in sublist],
+                        + [
+                            item
+                            for sublist in list(
+                                map(
+                                    list,
+                                    zip(
+                                        itertools.repeat("--threshold"),
+                                        [str(i) for i in tcd],
+                                    ),
+                                )
+                            )
+                            for item in sublist
+                        ],
                     },
                 }
             ],
-            Applications=[
-                {"Name": "Spark"},
-                {"Name": "Zeppelin"},
-                {"Name": "Ganglia"},
-            ],
+            Applications=[{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}],
             Configurations=[
                 {
                     "Classification": "spark",
@@ -375,7 +386,7 @@ class Tool(object):
             ],
             VisibleToAllUsers=True,
             JobFlowRole="EMR_EC2_DefaultRole",
-			ServiceRole="EMR_DefaultRole",
+            ServiceRole="EMR_DefaultRole",
             Tags=[
                 {"Key": "Project", "Value": "Global Forest Watch"},
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
