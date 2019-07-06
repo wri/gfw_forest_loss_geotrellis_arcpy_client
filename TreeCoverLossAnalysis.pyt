@@ -48,17 +48,17 @@ class Tool(object):
         tcd.filter.list = list(range(0, 100, 5))
         tcd.value = 30
 
-        slack_user = arcpy.Parameter(
-            displayName="Slack user name",
-            name="slack_user",
-            datatype="GPString",
-            parameterType="Optional",
-            direction="Input",
-            category="Notifications",
-        )
-
-        slack_user.filter.type = "ValueList"
-        slack_user.filter.list = ["David Gibbs", "liz.goldman", "thai", "thomas"]
+        # slack_user = arcpy.Parameter(
+        #     displayName="Slack user name",
+        #     name="slack_user",
+        #     datatype="GPString",
+        #     parameterType="Optional",
+        #     direction="Input",
+        #     category="Notifications",
+        # )
+        #
+        # slack_user.filter.type = "ValueList"
+        # slack_user.filter.list = ["David Gibbs", "liz.goldman", "thai", "thomas"]
 
         instance_type = arcpy.Parameter(
             displayName="Instance Parameter",
@@ -97,7 +97,7 @@ class Tool(object):
         params = [
             in_features,
             tcd,
-            slack_user,
+            # slack_user,
             instance_type,
             instance_count,
             out_features,
@@ -128,9 +128,9 @@ class Tool(object):
 
         tcd = parameters[1].value
 
-        instance_type = parameters[3].value
-        instance_count = parameters[4].value
-        out_features_path = parameters[5].valueAsText
+        instance_type = parameters[2].value
+        instance_count = parameters[3].value
+        out_features_path = parameters[4].valueAsText
 
         sr = arcpy.SpatialReference(4326)
 
