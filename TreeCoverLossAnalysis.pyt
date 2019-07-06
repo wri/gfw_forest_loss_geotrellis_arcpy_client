@@ -240,7 +240,7 @@ class Tool(object):
     def _launch_emr(self, in_features, tcd, instance_type, instance_count, messages):
 
         messages.addMessage("Start Cluster")
-        client = boto3.client("emr")
+        client = boto3.client("emr", region_name='us-east-1')
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
             LogUri="s3://gfw-files/2018_update/spark/logs",
