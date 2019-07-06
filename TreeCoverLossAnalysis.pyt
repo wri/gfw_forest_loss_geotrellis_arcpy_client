@@ -22,6 +22,8 @@ class Tool(object):
     fishnet_path = r"in_memory\fishnet"
     loss_extent_path = r"in_memory\loss_extent"
     tsv_file = "treecoverloss.tsv"
+    tsv_path = os.getenv("LOCALAPPDATA")
+    tsv_fullpath = os.path.join(tsv_path, tsv_file)
     tsv_s3_folder = "2018_updates/tsv"
     tsv_s3_bucket = "gfw-files"
     sr = arcpy.SpatialReference(4326)
@@ -213,10 +215,10 @@ class Tool(object):
             if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
                 id_field = field.name
 
-        if os.path.exists(self.tsv_file):
-            os.remove(self.tsv_file)
+        if os.path.exists(self.tsv_fullpath):
+            os.remove(self.tsv_fullpath)
 
-        with open(self.tsv_file, "a+") as output_file:
+        with open(self.tsv_fullpath, "a+") as output_file:
 
             with arcpy.da.SearchCursor(
                 self.out_features_path, [id_field, "SHAPE@WKB"]
@@ -230,7 +232,7 @@ class Tool(object):
         messages.addMessage("Upload to S3")
         s3 = boto3.resource("s3")
         s3.meta.client.upload_file(
-            self.tsv_file,
+            self.tsv_fullpath,
             self.tsv_s3_bucket,
             "{}/{}".format(self.tsv_s3_folder, self.tsv_file),
         )
@@ -391,7 +393,7 @@ class Tool(object):
 
     def _clean_up(self, messages):
         messages.addMessage("Clean up")
-        os.remove(self.tsv_file)
+        os.remove(self.tsv_fullpath)
         arcpy.Delete_management(self.fishnet_path)
         arcpy.Delete_management(self.loss_extent_path)
         arcpy.Delete_management(self.out_features_path)
