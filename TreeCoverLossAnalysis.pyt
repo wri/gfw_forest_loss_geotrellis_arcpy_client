@@ -273,7 +273,7 @@ class Tool(object):
                         "Name": "geotrellis-treecoverloss-cores",
                         "Market": "SPOT",
                         "InstanceRole": "CORE",
-                        "BidPrice": "NULL",
+                        #"BidPrice": "0.532",
                         "InstanceType": instance_type,
                         "InstanceCount": instance_count,
                         "EbsConfiguration": {
@@ -290,54 +290,54 @@ class Tool(object):
                         },
                     },
                 ],
-                "Ec2KeyName": "tmaschler2_wri",
-                "Placement": {"AvailabilityZone": "us-east-1c"},
+                "Ec2KeyName": "tmaschler_wri2",
                 "KeepJobFlowAliveWhenNoSteps": False,
                 "TerminationProtected": False,
-                "HadoopVersion": "string",
-                "Ec2SubnetId": "string",
                 "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
-                "EmrManagedMasterSecurityGroup": "subnet-08458452c1d05713b",
-                "EmrManagedSlaveSecurityGroup": "subnet-08458452c1d05713b",
-                "ServiceAccessSecurityGroup": "string",
+                "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
+                "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
+               # "ServiceAccessSecurityGroup": "string",
                 "AdditionalMasterSecurityGroups": [
-                    "sg-d76cdbc1",
-                    "sg-11e40a60",
-                    "subnet-08458452c1d05713b",
+                    "sg-d7a0d8ad",
+                    "sg-001e5f904c9cb7cc4",
+                    "sg-6c6a5911",
                 ],
-                "AdditionalSlaveSecurityGroups": ["subnet-08458452c1d05713b"],
+                "AdditionalSlaveSecurityGroups": [ 
+                    "sg-d7a0d8ad",
+                    "sg-6c6a5911",],
             },
             Steps=[
                 {
                     "Name": "treecoverloss-analysis",
                     "ActionOnFailure": "TERMINATE_CLUSTER",
                     "HadoopJarStep": {
-                        "Properties": [{"Key": "string", "Value": "string"}],
+                        #"Properties": [{"Key": "string", "Value": "string"}],
                         "Jar": "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
-                        "MainClass": "org.globalforestwatch.treecoverloss.TreeCoverLossSummaryMain",
+                        "MainClass": "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
                         "Args": [
                             "--features",
                             in_features,
-                            "--output s3://gfw-files/2018_update/results",
+                            "--output",
+                            "s3://gfw-files/2018_update/results",
                         ]
-                        + [item for sublist in list(map(list, zip(itertools.repeat("--threshold"), [i for i in tcd]))) for item in sublist],
+                        + [item for sublist in list(map(list, zip(itertools.repeat("--threshold"), [str(i) for i in tcd]))) for item in sublist],
                     },
                 }
             ],
             Applications=[
-                {"Name": "Spark", "Version": "2.4.2"},
-                {"Name": "Zeppelin", "Version": "0.8.1"},
-                {"Name": "Ganglia", "Version": "3.7.2"},
+                {"Name": "Spark"},
+                {"Name": "Zeppelin"},
+                {"Name": "Ganglia"},
             ],
             Configurations=[
                 {
-                    "classification": "spark",
-                    "properties": {"maximizeResourceAllocation": "true"},
-                   # "configurations": [],
+                    "Classification": "spark",
+                    "Properties": {"maximizeResourceAllocation": "true"},
+                    "Configurations": [],
                 },
                 {
-                    "classification": "spark-defaults",
-                    "properties": {
+                    "Classification": "spark-defaults",
+                    "Properties": {
                         "spark.executor.memory": "3G",
                         "spark.driver.memory": "3G",
                         "spark.driver.cores": "1",
@@ -361,20 +361,21 @@ class Tool(object):
                         "spark.dynamicAllocation.enabled": "false",
                         "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                     },
-                   # "configurations": [],
+                    "Configurations": [],
                 },
                 {
-                    "classification": "yarn-site",
-                    "properties": {
+                    "Classification": "yarn-site",
+                    "Properties": {
                         "yarn.nodemanager.pmem-check-enabled": "false",
                         "yarn.resourcemanager.am.max-attempts": "1",
                         "yarn.nodemanager.vmem-check-enabled": "false",
                     },
-                  #  "configurations": [],
+                    "Configurations": [],
                 },
             ],
             VisibleToAllUsers=True,
             JobFlowRole="EMR_EC2_DefaultRole",
+			ServiceRole="EMR_DefaultRole",
             Tags=[
                 {"Key": "Project", "Value": "Global Forest Watch"},
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
