@@ -2,6 +2,7 @@ import arcpy
 import binascii
 import boto3
 import itertools
+import os
 
 
 class Toolbox(object):
@@ -16,6 +17,15 @@ class Toolbox(object):
 
 
 class Tool(object):
+
+    out_features_path = r"in_memory\out_features"
+    fishnet_path = r"in_memory\fishnet"
+    loss_extent_path = r"in_memory\loss_extent"
+    tsv_file = "treecoverloss.tsv"
+    tsv_s3_folder = "2018_updates/tsv"
+    tsv_s3_bucket = "gfw-files"
+    sr = arcpy.SpatialReference(4326)
+
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
         self.label = "Tool"
@@ -84,15 +94,15 @@ class Tool(object):
 
         instance_count.value = 20
 
-        out_features = arcpy.Parameter(
-            displayName="Out features",
-            name="out_features",
-            datatype="GPFeatureLayer",
-            parameterType="Required",
-            direction="Output",
-        )
-
-        out_features.value = r"in_memory\out_features"
+        # out_features = arcpy.Parameter(
+        #     displayName="Out features",
+        #     name="out_features",
+        #     datatype="GPFeatureLayer",
+        #     parameterType="Required",
+        #     direction="Output",
+        # )
+        #
+        # out_features.value = r"in_memory\out_features"
 
         params = [
             in_features,
@@ -100,7 +110,7 @@ class Tool(object):
             # slack_user,
             instance_type,
             instance_count,
-            out_features,
+            # out_features,
         ]
 
         return params
@@ -123,27 +133,42 @@ class Tool(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
 
+        arcpy.env.overwriteOutput = True
+
         in_features = parameters[0].valueAsText
-        arcpy.MakeFeatureLayer_management(in_features, "in_features")
-
         tcd = parameters[1].value
-
         instance_type = parameters[2].value
         instance_count = parameters[3].value
-        out_features_path = parameters[4].valueAsText
+        # self.out_features_path = parameters[4].valueAsText
 
-        sr = arcpy.SpatialReference(4326)
+        arcpy.MakeFeatureLayer_management(in_features, "in_features")
 
-        fishnet_path = r"in_memory\fishnet"
-        loss_extent_path = r"in_memory\loss_extent"
-        tsv_file = "treecoverloss.tsv"
-        tsv_s3_folder = "2018_updates/tsv"
-        tsv_s3_bucket = "gfw-files"
+        self._make_fishnet_layer(messages)
+        self._make_loss_extent_layer(messages)
+        self._chop_geometries(messages)
+        self._export_wbk(messages)
+        self._upload_to_s3(messages)
+        self._launch_emr(
+            "s3://{}/{}/{}".format(
+                self.tsv_s3_bucket, self.tsv_s3_folder, self.tsv_file
+            ),
+            tcd,
+            instance_type,
+            instance_count,
+            messages,
+        )
 
-        # Create fishnet
-        messages.addMessage("Compute in memory fishnet")
+        messages.addMessage(
+            "DONE - check AWS EMR for cluster status and AWS S3 folder for results"
+        )
+
+        return
+
+    def _make_fishnet_layer(self, messages):
+
+        messages.addMessage("Compute 1x1 degree fishnet")
         arcpy.CreateFishnet_management(
-            fishnet_path,
+            self.fishnet_path,
             "-180 -90",
             "-180, 90",
             1,
@@ -154,83 +179,65 @@ class Tool(object):
             template=arcpy.Extent(-180, -90, 180, 90),
             geometry_type="POLYGON",
         )
-        messages.addMessage("Define Projection for Fishnet")
-        arcpy.DefineProjection_management(fishnet_path, sr)
+        arcpy.DefineProjection_management(self.fishnet_path, self.sr)
+        arcpy.MakeFeatureLayer_management(self.fishnet_path, "fishnet")
 
-        arcpy.MakeFeatureLayer_management(fishnet_path, "fishnet")
-
-        # intersect input feature with fishnet and forest loss extent
+    def _make_loss_extent_layer(self, messages):
         messages.addMessage("Load Loss Extent")
         loss_extent_geom = arcpy.AsShape(self.loss_extent, False)
         arcpy.CreateFeatureclass_management(
-            "in_memory", "loss_extent", "POLYGON", spatial_reference=sr
+            "in_memory", "loss_extent", "POLYGON", spatial_reference=self.sr
         )
-
-        cursor = arcpy.da.InsertCursor(loss_extent_path, ["SHAPE@"])
+        cursor = arcpy.da.InsertCursor(self.loss_extent_path, ["SHAPE@"])
         cursor.insertRow([loss_extent_geom])
+        arcpy.MakeFeatureLayer_management(self.loss_extent_path, "loss_extent")
 
-        #  messages.addMessage("Define Projection for Loss Extent")
-        #  arcpy.DefineProjection_management(loss_extent, sr)
-        #
-        arcpy.MakeFeatureLayer_management(loss_extent_path, "loss_extent")
-        #    arcpy.Copy_management(loss_proj,out_features_path)
+    def _chop_geometries(self, messages):
 
         messages.addMessage("Intersect layers")
         arcpy.Intersect_analysis(
             in_features="in_features 3;loss_extent 1; fishnet 2",
-            out_feature_class=out_features_path,
+            out_feature_class=self.out_features_path,
             join_attributes="ONLY_FID",
             cluster_tolerance="-1 Unknown",
             output_type="INPUT",
         )
 
-        # Export to WKB
+    def _export_wbk(self, messages):
+
+        messages.addMessage("Export to WKB")
 
         id_field = None
-        fields = arcpy.ListFields(out_features_path, field_type="Integer")
+        fields = arcpy.ListFields(self.out_features_path, field_type="Integer")
         for field in fields:
             if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
                 id_field = field.name
 
-        with open(tsv_file, "a+") as output_file:
+        if os.path.exists(self.tsv_file):
+            os.remove(self.tsv_file)
+
+        with open(self.tsv_file, "a+") as output_file:
 
             with arcpy.da.SearchCursor(
-                out_features_path, [id_field, "SHAPE@WKB"]
+                self.out_features_path, [id_field, "SHAPE@WKB"]
             ) as cursor:
                 for row in cursor:
                     gid = row[0]
                     wkb = binascii.hexlify(row[1])
                     output_file.write(str(gid) + "\t" + wkb + "\n")
 
-        # Upload inout features to S3
-
+    def _upload_to_s3(self, messages):
         messages.addMessage("Upload to S3")
         s3 = boto3.resource("s3")
         s3.meta.client.upload_file(
-            tsv_file, tsv_s3_bucket, "{}/{}".format(tsv_s3_folder, tsv_file)
+            self.tsv_file,
+            self.tsv_s3_bucket,
+            "{}/{}".format(self.tsv_s3_folder, self.tsv_file),
         )
 
-        # config spark cluster
+    def _launch_emr(self, in_features, tcd, instance_type, instance_count, messages):
+
         messages.addMessage("Start Cluster")
-        cluster = self._launch_emr(
-            "s3://{}/{}/{}".format(tsv_s3_bucket, tsv_s3_folder, tsv_file),
-            tcd,
-            instance_type,
-            instance_count,
-        )
-
-        messages.addMessage(cluster)
-
-        messages.addMessage(
-            "DONE - check AWS EMR for cluster status and AWS S3 folder for results"
-        )
-
-        return
-
-    def _launch_emr(
-        self, in_features, tcd, instance_type="m3.2xlarge", instance_count=20
-    ):
-
         client = boto3.client("emr")
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
@@ -378,7 +385,16 @@ class Tool(object):
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
             ],
         )
-        return response
+
+        messages.addMessage(response)
+        return
+
+    def _clean_up(self, messages):
+        messages.addMessage("Clean up")
+        os.remove(self.tsv_file)
+        arcpy.Delete_management(self.fishnet_path)
+        arcpy.Delete_management(self.loss_extent_path)
+        arcpy.Delete_management(self.out_features_path)
 
     loss_extent = {
         "type": "MultiPolygon",
