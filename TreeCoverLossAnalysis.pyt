@@ -320,7 +320,7 @@ class Tool(object):
                             in_features,
                             "--output s3://gfw-files/2018_update/results",
                         ]
-                        + list(zip(itertools.repeat("--threshold"), [i for i in tcd])),
+                        + [item for sublist in list(map(list, zip(itertools.repeat("--threshold"), [i for i in tcd]))) for item in sublist],
                     },
                 }
             ],
