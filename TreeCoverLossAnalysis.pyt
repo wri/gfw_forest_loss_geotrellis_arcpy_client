@@ -1,6 +1,7 @@
 import arcpy
 import binascii
 import boto3
+from datetime import datetime
 import itertools
 import os
 
@@ -13,30 +14,30 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [Tool]
+        self.tools = [TreeCoverLossAnalysis]
 
 
-class Tool(object):
+class TreeCoverLossAnalysis(object):
 
-    out_features_path = r"in_memory\out_features"
+    out_features_path = None  # r"in_memory\out_features"
     fishnet_path = r"in_memory\fishnet"
     loss_extent_path = r"in_memory\loss_extent"
-    tsv_file = "treecoverloss.tsv"
     tsv_path = os.getenv("LOCALAPPDATA")
-    tsv_fullpath = os.path.join(tsv_path, tsv_file)
+    tsv_file = None  # "treecoverloss.tsv"
+    tsv_fullpath = None  # os.path.join(tsv_path, tsv_file)
     tsv_s3_folder = "2018_updates/tsv"
     tsv_s3_bucket = "gfw-files"
     sr = arcpy.SpatialReference(4326)
 
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Tool"
-        self.description = ""
+        self.label = "Tree Cover Loss Analysis"
+        self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
         self.canRunInBackground = False
 
     def getParameterInfo(self):
         """Define parameter definitions"""
-        # First parameter
+
         in_features = arcpy.Parameter(
             displayName="Input Features",
             name="in_features",
@@ -51,39 +52,47 @@ class Tool(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input",
-            # default=[30],
             multiValue=True,
         )
-        # Set a value list of 1, 10 and 100
 
         tcd.filter.type = "ValueList"
         tcd.filter.list = list(range(0, 100, 5))
         tcd.value = 30
 
-        # slack_user = arcpy.Parameter(
-        #     displayName="Slack user name",
-        #     name="slack_user",
-        #     datatype="GPString",
-        #     parameterType="Optional",
-        #     direction="Input",
-        #     category="Notifications",
-        # )
-        #
-        # slack_user.filter.type = "ValueList"
-        # slack_user.filter.list = ["David Gibbs", "liz.goldman", "thai", "thomas"]
+        primary_forests = arcpy.Parameter(
+            displayName="Include Primary Forests",
+            name="primary_forests",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+        )
+        primary_forests.value = False
 
-        instance_type = arcpy.Parameter(
-            displayName="Instance Parameter",
-            name="instance_parameter",
+        master_instance_type = arcpy.Parameter(
+            displayName="Worker Instance Type",
+            name="worker_instance_parameter",
             datatype="GPString",
             parameterType="Required",
             direction="Input",
             category="Spark config",
         )
 
-        instance_type.filter.type = "ValueList"
-        instance_type.list = ["m3.2xlarge"]
-        instance_type.value = "m3.2xlarge"
+        master_instance_type.filter.type = "ValueList"
+        master_instance_type.list = ["r5.2xlarge", "m5.4xlarge" "c5.9xlarge"]
+        master_instance_type.value = "r5.2xlarge"
+
+        worker_instance_type = arcpy.Parameter(
+            displayName="Worker Instance Type",
+            name="worker_instance_parameter",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input",
+            category="Spark config",
+        )
+
+        worker_instance_type.filter.type = "ValueList"
+        worker_instance_type.list = ["r3.2xlarge"]
+        worker_instance_type.value = "r3.2xlarge"
 
         instance_count = arcpy.Parameter(
             displayName="Number of workers",
@@ -96,23 +105,26 @@ class Tool(object):
 
         instance_count.value = 4
 
-        # out_features = arcpy.Parameter(
-        #     displayName="Out features",
-        #     name="out_features",
-        #     datatype="GPFeatureLayer",
-        #     parameterType="Required",
-        #     direction="Output",
-        # )
-        #
-        # out_features.value = r"in_memory\out_features"
+        out_features = arcpy.Parameter(
+            displayName="Out features",
+            name="out_features",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Output",
+        )
+
+        out_features.value = r"in_memory\treecoverloss_{}".format(
+            datetime.now().strftime("%Y%m%d%H%M%S")
+        )
 
         params = [
             in_features,
             tcd,
-            # slack_user,
-            instance_type,
+            primary_forests,
+            master_instance_type,
+            worker_instance_type,
             instance_count,
-            # out_features,
+            out_features,
         ]
 
         return params
@@ -136,12 +148,18 @@ class Tool(object):
         """The source code of the tool."""
 
         arcpy.env.overwriteOutput = True
+        arcpy.env.outputCoordinateSystem = self.sr
 
         in_features = parameters[0].valueAsText
         tcd = parameters[1].values
-        instance_type = parameters[2].value
-        instance_count = parameters[3].value
-        # self.out_features_path = parameters[4].valueAsText
+        primary_forests = parameters[2].value
+        master_instance_type = parameters[3].value
+        worker_instance_type = parameters[4].value
+        worker_instance_count = parameters[5].value
+
+        self.out_features_path = parameters[6].valueAsText
+        self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
+        self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
 
         arcpy.MakeFeatureLayer_management(in_features, "in_features")
 
@@ -155,8 +173,10 @@ class Tool(object):
                 self.tsv_s3_bucket, self.tsv_s3_folder, self.tsv_file
             ),
             tcd,
-            instance_type,
-            instance_count,
+            primary_forests,
+            master_instance_type,
+            worker_instance_type,
+            worker_instance_count,
             messages,
         )
 
@@ -237,153 +257,164 @@ class Tool(object):
             "{}/{}".format(self.tsv_s3_folder, self.tsv_file),
         )
 
-    def _launch_emr(self, in_features, tcd, instance_type, instance_count, messages):
+    def _launch_emr(
+        self,
+        in_features,
+        tcd,
+        primary_forests,
+        master_instance_type,
+        worker_instance_type,
+        worker_instance_count,
+        messages
+    ):
 
         messages.addMessage("Start Cluster")
         client = boto3.client("emr", region_name="us-east-1")
+
+        instances = {
+            "InstanceGroups": [
+                {
+                    "Name": "geotrellis-treecoverloss-master",
+                    "Market": "ON_DEMAND",
+                    "InstanceRole": "MASTER",
+                    "InstanceType": master_instance_type,
+                    "InstanceCount": 1,
+                    "EbsConfiguration": {
+                        "EbsBlockDeviceConfigs": [
+                            {
+                                "VolumeSpecification": {
+                                    "VolumeType": "gp2",
+                                    "SizeInGB": 10,
+                                },
+                                "VolumesPerInstance": 1,
+                            }
+                        ],
+                        "EbsOptimized": True,
+                    },
+                },
+                {
+                    "Name": "geotrellis-treecoverloss-cores",
+                    "Market": "SPOT",
+                    "InstanceRole": "CORE",
+                    # "BidPrice": "0.532",
+                    "InstanceType": worker_instance_type,
+                    "InstanceCount": worker_instance_count,
+                    "EbsConfiguration": {
+                        "EbsBlockDeviceConfigs": [
+                            {
+                                "VolumeSpecification": {
+                                    "VolumeType": "gp2",
+                                    "SizeInGB": 10,
+                                },
+                                "VolumesPerInstance": 1,
+                            }
+                        ],
+                        "EbsOptimized": True,
+                    },
+                },
+            ],
+            "Ec2KeyName": "tmaschler_wri2",
+            "KeepJobFlowAliveWhenNoSteps": False,
+            "TerminationProtected": False,
+            "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
+            "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
+            "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
+            "AdditionalMasterSecurityGroups": [
+                "sg-d7a0d8ad",
+                "sg-001e5f904c9cb7cc4",
+                "sg-6c6a5911",
+            ],
+            "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
+        }
+
+        steps = [
+            {
+                "Name": "treecoverloss-analysis",
+                "ActionOnFailure": "TERMINATE_CLUSTER",
+                "HadoopJarStep": {
+                    "Jar": "command-runner.jar",
+                    "Args": [
+                        "spark-submit",
+                        "--deploy-modecluster",
+                        "--class",
+                        "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
+                        "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
+                        "--features",
+                        in_features,
+                        "--output",
+                        "s3://gfw-files/2018_update/results",
+                    ]
+                    + [
+                        item
+                        for sublist in list(
+                            map(
+                                list,
+                                zip(
+                                    itertools.repeat("--threshold"),
+                                    [str(i) for i in tcd],
+                                ),
+                            )
+                        )
+                        for item in sublist
+                    ],
+                },
+            }
+        ]
+
+        if primary_forests:
+            steps[0]["HadoopJarStep"]["Args"].append("--primary-forests")
+
+        applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
+
+        configurations = [
+            {
+                "Classification": "spark",
+                "Properties": {"maximizeResourceAllocation": "true"},
+                "Configurations": [],
+            },
+            {
+                "Classification": "spark-defaults",
+                "Properties": {
+                    "spark.executor.memory": "6G",
+                    "spark.driver.memory": "6G",
+                    "spark.driver.cores": "1",
+                    "spark.driver.maxResultSize": "3G",
+                    "spark.rdd.compress": "true",
+                    "spark.executor.cores": "1",
+                    "spark.sql.shuffle.partitions": "{}".format(
+                        (70 * worker_instance_count) - 1
+                    ),
+                    "spark.shuffle.spill.compress": "true",
+                    "spark.shuffle.compress": "true",
+                    "spark.default.parallelism": "{}".format((70 * worker_instance_count) - 1),
+                    "spark.shuffle.service.enabled": "true",
+                    "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
+                    "spark.executor.instances": "{}".format((7 * worker_instance_count) - 1),
+                    "spark.yarn.executor.memoryOverhead": "1G",
+                    "spark.dynamicAllocation.enabled": "false",
+                    "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
+                },
+                "Configurations": [],
+            },
+            {
+                "Classification": "yarn-site",
+                "Properties": {
+                    "yarn.nodemanager.pmem-check-enabled": "false",
+                    "yarn.resourcemanager.am.max-attempts": "1",
+                    "yarn.nodemanager.vmem-check-enabled": "false",
+                },
+                "Configurations": [],
+            },
+        ]
+
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
             LogUri="s3://gfw-files/2018_update/spark/logs",
             ReleaseLabel="emr-5.24.0",
-            Instances={
-                # "MasterInstanceType": instance_type,
-                # "SlaveInstanceType": instance_type,
-                # "InstanceCount": instance_count + 1,
-                "InstanceGroups": [
-                    {
-                        "Name": "geotrellis-treecoverloss-master",
-                        "Market": "ON_DEMAND",
-                        "InstanceRole": "MASTER",
-                        "InstanceType": instance_type,
-                        "InstanceCount": 1,
-                        "EbsConfiguration": {
-                            "EbsBlockDeviceConfigs": [
-                                {
-                                    "VolumeSpecification": {
-                                        "VolumeType": "gp2",
-                                        "SizeInGB": 10,
-                                    },
-                                    "VolumesPerInstance": 1,
-                                }
-                            ],
-                            "EbsOptimized": True,
-                        },
-                    },
-                    {
-                        "Name": "geotrellis-treecoverloss-cores",
-                        "Market": "SPOT",
-                        "InstanceRole": "CORE",
-                        # "BidPrice": "0.532",
-                        "InstanceType": instance_type,
-                        "InstanceCount": instance_count,
-                        "EbsConfiguration": {
-                            "EbsBlockDeviceConfigs": [
-                                {
-                                    "VolumeSpecification": {
-                                        "VolumeType": "gp2",
-                                        "SizeInGB": 10,
-                                    },
-                                    "VolumesPerInstance": 1,
-                                }
-                            ],
-                            "EbsOptimized": True,
-                        },
-                    },
-                ],
-                "Ec2KeyName": "tmaschler_wri2",
-                "KeepJobFlowAliveWhenNoSteps": False,
-                "TerminationProtected": False,
-                "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
-                "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
-                "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
-                # "ServiceAccessSecurityGroup": "string",
-                "AdditionalMasterSecurityGroups": [
-                    "sg-d7a0d8ad",
-                    "sg-001e5f904c9cb7cc4",
-                    "sg-6c6a5911",
-                ],
-                "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
-            },
-            Steps=[
-                {
-                    "Name": "treecoverloss-analysis",
-                    "ActionOnFailure": "TERMINATE_CLUSTER",
-                    "HadoopJarStep": {
-                        # "Properties": [{"Key": "string", "Value": "string"}],
-                        "Jar": "command-runner.jar",
-                        # "MainClass": "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
-                        "Args": [
-                            "spark-submit",
-                            "--deploy-modecluster",
-                            "--class",
-                            "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
-                            "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
-                            "--features",
-                            in_features,
-                            "--output",
-                            "s3://gfw-files/2018_update/results",
-                        ]
-                        + [
-                            item
-                            for sublist in list(
-                                map(
-                                    list,
-                                    zip(
-                                        itertools.repeat("--threshold"),
-                                        [str(i) for i in tcd],
-                                    ),
-                                )
-                            )
-                            for item in sublist
-                        ],
-                    },
-                }
-            ],
-            Applications=[{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}],
-            Configurations=[
-                {
-                    "Classification": "spark",
-                    "Properties": {"maximizeResourceAllocation": "true"},
-                    "Configurations": [],
-                },
-                {
-                    "Classification": "spark-defaults",
-                    "Properties": {
-                        "spark.executor.memory": "3G",
-                        "spark.driver.memory": "3G",
-                        "spark.driver.cores": "1",
-                        "spark.driver.maxResultSize": "3G",
-                        "spark.rdd.compress": "true",
-                        "spark.executor.cores": "1",
-                        "spark.sql.shuffle.partitions": "{}".format(
-                            (70 * instance_count) - 1
-                        ),
-                        "spark.shuffle.spill.compress": "true",
-                        "spark.shuffle.compress": "true",
-                        "spark.default.parallelism": "{}".format(
-                            (70 * instance_count) - 1
-                        ),
-                        "spark.shuffle.service.enabled": "true",
-                        "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                        "spark.executor.instances": "{}".format(
-                            (7 * instance_count) - 1
-                        ),
-                        "spark.yarn.executor.memoryOverhead": "1G",
-                        "spark.dynamicAllocation.enabled": "false",
-                        "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                    },
-                    "Configurations": [],
-                },
-                {
-                    "Classification": "yarn-site",
-                    "Properties": {
-                        "yarn.nodemanager.pmem-check-enabled": "false",
-                        "yarn.resourcemanager.am.max-attempts": "1",
-                        "yarn.nodemanager.vmem-check-enabled": "false",
-                    },
-                    "Configurations": [],
-                },
-            ],
+            Instances=instances,
+            Steps=steps,
+            Applications=applications,
+            Configurations=configurations,
             VisibleToAllUsers=True,
             JobFlowRole="EMR_EC2_DefaultRole",
             ServiceRole="EMR_DefaultRole",
@@ -401,7 +432,7 @@ class Tool(object):
         os.remove(self.tsv_fullpath)
         arcpy.Delete_management(self.fishnet_path)
         arcpy.Delete_management(self.loss_extent_path)
-        arcpy.Delete_management(self.out_features_path)
+        # arcpy.Delete_management(self.out_features_path)
 
     loss_extent = {
         "type": "MultiPolygon",
