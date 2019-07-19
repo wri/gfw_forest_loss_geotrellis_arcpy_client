@@ -335,7 +335,8 @@ class TreeCoverLossAnalysis(object):
                     "Jar": "command-runner.jar",
                     "Args": [
                         "spark-submit",
-                        "--deploy-modecluster",
+                        "--deploy-mode",
+                        "cluster",
                         "--class",
                         "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
                         "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
