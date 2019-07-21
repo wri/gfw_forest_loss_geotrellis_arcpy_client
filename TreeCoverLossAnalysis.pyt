@@ -69,8 +69,8 @@ class TreeCoverLossAnalysis(object):
         primary_forests.value = False
 
         master_instance_type = arcpy.Parameter(
-            displayName="Worker Instance Type",
-            name="worker_instance_parameter",
+            displayName="Master Instance Type",
+            name="master_instance_parameter",
             datatype="GPString",
             parameterType="Required",
             direction="Input",
