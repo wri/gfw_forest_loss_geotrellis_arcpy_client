@@ -105,6 +105,17 @@ class TreeCoverLossAnalysis(object):
 
         instance_count.value = 4
 
+        jar_version = arcpy.Parameter(
+            displayName="JAR version",
+            name="jar_version",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input",
+            category="Spark config",
+        )
+
+        jar_version.value = "0.8.4"
+
         out_features = arcpy.Parameter(
             displayName="Out features",
             name="out_features",
@@ -117,6 +128,15 @@ class TreeCoverLossAnalysis(object):
             datetime.now().strftime("%Y%m%d%H%M%S")
         )
 
+        add_features_to_map = arcpy.Parameter(
+            displayName="Add features to map",
+            name="add_features_to_map",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+        )
+        add_features_to_map.value = False
+
         params = [
             in_features,
             tcd,
@@ -124,7 +144,9 @@ class TreeCoverLossAnalysis(object):
             master_instance_type,
             worker_instance_type,
             instance_count,
+            jar_version,
             out_features,
+            add_features_to_map,
         ]
 
         return params
@@ -156,8 +178,11 @@ class TreeCoverLossAnalysis(object):
         master_instance_type = parameters[3].value
         worker_instance_type = parameters[4].value
         worker_instance_count = parameters[5].value
+        jar_version = parameters[6].valueAsText
 
-        self.out_features_path = parameters[6].valueAsText
+        self.out_features_path = parameters[7].valueAsText
+        add_features_to_map = parameters[8].value
+
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
 
@@ -166,7 +191,8 @@ class TreeCoverLossAnalysis(object):
         self._make_fishnet_layer(messages)
         self._make_loss_extent_layer(messages)
         self._chop_geometries(messages)
-        self._load_layer(messages)
+        if add_features_to_map:
+            self._load_layer(messages)
         self._export_wbk(messages)
         self._upload_to_s3(messages)
         self._launch_emr(
@@ -178,8 +204,10 @@ class TreeCoverLossAnalysis(object):
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
+            jar_version,
             messages,
         )
+        self._clean_up(add_features_to_map, messages)
 
         messages.addMessage(
             "DONE - check AWS EMR for cluster status and AWS S3 folder for results"
@@ -228,8 +256,8 @@ class TreeCoverLossAnalysis(object):
 
     def _load_layer(self, messages):
         messages.addMessage("Add layer to map")
-        mxd = arcpy.mp.ArcGISProject("CURRENT")
-        df = mxd.listMaps('*')[0]
+        mxd = arcpy.mapping.MapDocument("CURRENT")
+        df = arcpy.mapping.ListDataFrames(mxd,"*")[0]
         layer = arcpy.mapping.Layer(self.out_features_path)
         arcpy.mapping.AddLayer(df, layer, "AUTO_ARRANGE")
 
@@ -273,6 +301,7 @@ class TreeCoverLossAnalysis(object):
         master_instance_type,
         worker_instance_type,
         worker_instance_count,
+        jar_version,
         messages
     ):
 
@@ -347,7 +376,7 @@ class TreeCoverLossAnalysis(object):
                         "cluster",
                         "--class",
                         "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
-                        "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-0.8.4.jar",
+                        "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-{}.jar".format(jar_version),
                         "--features",
                         in_features,
                         "--output",
@@ -436,12 +465,13 @@ class TreeCoverLossAnalysis(object):
         messages.addMessage(response)
         return
 
-    def _clean_up(self, messages):
+    def _clean_up(self, keep_features, messages):
         messages.addMessage("Clean up")
         os.remove(self.tsv_fullpath)
         arcpy.Delete_management(self.fishnet_path)
         arcpy.Delete_management(self.loss_extent_path)
-        # arcpy.Delete_management(self.out_features_path)
+        if not keep_features:
+            arcpy.Delete_management(self.out_features_path)
 
     loss_extent = {
         "type": "MultiPolygon",
