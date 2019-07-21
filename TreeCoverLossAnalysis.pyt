@@ -166,6 +166,7 @@ class TreeCoverLossAnalysis(object):
         self._make_fishnet_layer(messages)
         self._make_loss_extent_layer(messages)
         self._chop_geometries(messages)
+        self._load_layer(messages)
         self._export_wbk(messages)
         self._upload_to_s3(messages)
         self._launch_emr(
@@ -224,6 +225,13 @@ class TreeCoverLossAnalysis(object):
             cluster_tolerance="-1 Unknown",
             output_type="INPUT",
         )
+
+    def _load_layer(self, messages):
+        messages.addMessage("Add layer to map")
+        mxd = arcpy.mp.ArcGISProject("CURRENT")
+        df = mxd.listMaps('*')[0]
+        layer = arcpy.mapping.Layer(self.out_features_path)
+        arcpy.mapping.AddLayer(df, layer, "AUTO_ARRANGE")
 
     def _export_wbk(self, messages):
 
