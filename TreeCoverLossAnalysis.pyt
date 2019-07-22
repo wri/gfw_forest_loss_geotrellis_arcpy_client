@@ -59,6 +59,18 @@ class TreeCoverLossAnalysis(object):
         tcd.filter.list = list(range(0, 100, 5))
         tcd.value = 30
 
+        tcd_year = arcpy.Parameter(
+            displayName="Tree Cover Density Reference Year",
+            name="tcd_year",
+            datatype="GPLong",
+            parameterType="Required",
+            direction="Input",
+        )
+
+        tcd_year.filter.type = "ValueList"
+        tcd_year.filter.list = [2000, 2010]
+        tcd_year.value = 2000
+
         primary_forests = arcpy.Parameter(
             displayName="Include Primary Forests",
             name="primary_forests",
@@ -140,6 +152,7 @@ class TreeCoverLossAnalysis(object):
         params = [
             in_features,
             tcd,
+            tcd_year,
             primary_forests,
             master_instance_type,
             worker_instance_type,
@@ -174,14 +187,15 @@ class TreeCoverLossAnalysis(object):
 
         in_features = parameters[0].valueAsText
         tcd = parameters[1].values
-        primary_forests = parameters[2].value
-        master_instance_type = parameters[3].value
-        worker_instance_type = parameters[4].value
-        worker_instance_count = parameters[5].value
-        jar_version = parameters[6].valueAsText
+        tcd_year = parameters[2].value
+        primary_forests = parameters[3].value
+        master_instance_type = parameters[4].value
+        worker_instance_type = parameters[5].value
+        worker_instance_count = parameters[6].value
+        jar_version = parameters[7].valueAsText
 
-        self.out_features_path = parameters[7].valueAsText
-        add_features_to_map = parameters[8].value
+        self.out_features_path = parameters[8].valueAsText
+        add_features_to_map = parameters[9].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -200,6 +214,7 @@ class TreeCoverLossAnalysis(object):
                 self.tsv_s3_bucket, self.tsv_s3_folder, self.tsv_file
             ),
             tcd,
+            tcd_year,
             primary_forests,
             master_instance_type,
             worker_instance_type,
@@ -257,7 +272,7 @@ class TreeCoverLossAnalysis(object):
     def _load_layer(self, messages):
         messages.addMessage("Add layer to map")
         mxd = arcpy.mapping.MapDocument("CURRENT")
-        df = arcpy.mapping.ListDataFrames(mxd,"*")[0]
+        df = arcpy.mapping.ListDataFrames(mxd, "*")[0]
         layer = arcpy.mapping.Layer(self.out_features_path)
         arcpy.mapping.AddLayer(df, layer, "AUTO_ARRANGE")
 
@@ -297,12 +312,13 @@ class TreeCoverLossAnalysis(object):
         self,
         in_features,
         tcd,
+        tcd_year,
         primary_forests,
         master_instance_type,
         worker_instance_type,
         worker_instance_count,
         jar_version,
-        messages
+        messages,
     ):
 
         messages.addMessage("Start Cluster")
@@ -376,11 +392,15 @@ class TreeCoverLossAnalysis(object):
                         "cluster",
                         "--class",
                         "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
-                        "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-{}.jar".format(jar_version),
+                        "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-{}.jar".format(
+                            jar_version
+                        ),
                         "--features",
                         in_features,
                         "--output",
                         "s3://gfw-files/2018_update/results",
+                        "--tcd",
+                        str(tcd_year),
                     ]
                     + [
                         item
@@ -424,10 +444,14 @@ class TreeCoverLossAnalysis(object):
                     ),
                     "spark.shuffle.spill.compress": "true",
                     "spark.shuffle.compress": "true",
-                    "spark.default.parallelism": "{}".format((70 * worker_instance_count) - 1),
+                    "spark.default.parallelism": "{}".format(
+                        (70 * worker_instance_count) - 1
+                    ),
                     "spark.shuffle.service.enabled": "true",
                     "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                    "spark.executor.instances": "{}".format((7 * worker_instance_count) - 1),
+                    "spark.executor.instances": "{}".format(
+                        (7 * worker_instance_count) - 1
+                    ),
                     "spark.yarn.executor.memoryOverhead": "1G",
                     "spark.dynamicAllocation.enabled": "false",
                     "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
