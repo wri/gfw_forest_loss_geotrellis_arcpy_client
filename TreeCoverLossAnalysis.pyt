@@ -82,7 +82,7 @@ class TreeCoverLossAnalysis(object):
 
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
-            name="master_instance_parameter",
+            name="master_instance_type",
             datatype="GPString",
             parameterType="Required",
             direction="Input",
@@ -90,12 +90,12 @@ class TreeCoverLossAnalysis(object):
         )
 
         master_instance_type.filter.type = "ValueList"
-        master_instance_type.list = ["r5.2xlarge", "m5.4xlarge", "c5.9xlarge"]
+        master_instance_type.filter.list = ["r5.2xlarge", "m5.4xlarge", "c5.9xlarge"]
         master_instance_type.value = "r5.2xlarge"
 
         worker_instance_type = arcpy.Parameter(
             displayName="Worker Instance Type",
-            name="worker_instance_parameter",
+            name="worker_instance_type",
             datatype="GPString",
             parameterType="Required",
             direction="Input",
@@ -103,7 +103,7 @@ class TreeCoverLossAnalysis(object):
         )
 
         worker_instance_type.filter.type = "ValueList"
-        worker_instance_type.list = ["r3.2xlarge"]
+        worker_instance_type.filter.list = ["r3.2xlarge"]
         worker_instance_type.value = "r3.2xlarge"
 
         instance_count = arcpy.Parameter(
