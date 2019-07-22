@@ -90,7 +90,7 @@ class TreeCoverLossAnalysis(object):
         )
 
         master_instance_type.filter.type = "ValueList"
-        master_instance_type.list = ["r5.2xlarge", "m5.4xlarge" "c5.9xlarge"]
+        master_instance_type.list = ["r5.2xlarge", "m5.4xlarge", "c5.9xlarge"]
         master_instance_type.value = "r5.2xlarge"
 
         worker_instance_type = arcpy.Parameter(
