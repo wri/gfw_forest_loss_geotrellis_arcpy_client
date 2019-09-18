@@ -103,8 +103,8 @@ class TreeCoverLossAnalysis(object):
         )
 
         worker_instance_type.filter.type = "ValueList"
-        worker_instance_type.filter.list = ["r3.2xlarge"]
-        worker_instance_type.value = "r3.2xlarge"
+        worker_instance_type.filter.list = ["r3.2xlarge", "r4.2xlarge", "r5.2xlarge"]
+        worker_instance_type.value = "r4.2xlarge"
 
         instance_count = arcpy.Parameter(
             displayName="Number of workers",
