@@ -8,9 +8,9 @@ as TSV file and uploads it to S3.
 Afterwards it launches a SPARK cluster on AWS EMR and runs the GFW tree cover analysis.
 The last step is asynchronous. The toolbox exits while the cluster is still running.
 
-You can monitor progress directly on AWS EMR console. Final results will be stored on S3
+You can monitor progress directly on AWS EMR console. Final results will be stored on S3 in your user folder.
 
-`s3://gfw-files/2018-update/result/treecoverloss_<date_time>/`
+`s3://wri-users/{your user name}/geotrellis/results/treecoverloss_<date_time>/`
 
 ## Installation and dependencies
 
