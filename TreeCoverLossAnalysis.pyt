@@ -37,7 +37,7 @@ class TreeCoverLossAnalysis(object):
         self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
         self.canRunInBackground = False
         self.aws_account_name = boto3.client('sts').get_caller_identity().get("Arn").split("/")[1]
-        self.s3_in_features_prefix = f"{self.aws_account_name}/{self.s3_in_folder}/{self.tsv_file}"
+        self.s3_in_features_prefix = "{}/{}/{}".format(self.aws_account_name,self.s3_in_folder,self.tsv_file)
 
     def getParameterInfo(self):
         """Define parameter definitions"""
@@ -213,7 +213,7 @@ class TreeCoverLossAnalysis(object):
             self._load_layer(messages)
         self._export_wbk(messages)
         self._upload_to_s3(messages)
-        self._launch_emr(f"s3://{self.s3_bucket}/{self.s3_in_features_prefix}",
+        self._launch_emr("s3://{}/{}".format(self.s3_bucket, self.s3_in_features_prefix),
             tcd,
             tcd_year,
             primary_forests,
@@ -393,11 +393,11 @@ class TreeCoverLossAnalysis(object):
                         "cluster",
                         "--class",
                         "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
-                        f"s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{jar_version}.jar",
+                        "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(jar_version),
                         "--features",
                         in_features,
                         "--output",
-                        f"s3://{self.s3_bucket}/{self.aws_account_name}/{self.s3_out_folder}",
+                        "s3://{}/{}/{}".format(self.s3_bucket,self.aws_account_name,self.s3_out_folder),
                         "--tcd",
                         str(tcd_year),
                     ]
@@ -470,7 +470,7 @@ class TreeCoverLossAnalysis(object):
 
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
-            LogUri=f"s3://{self.s3_bucket}/{self.aws_account_name}/{self.s3_log_folder}",
+            LogUri="s3://{}/{}/{}".format(self.s3_bucket, self.aws_account_name, self.s3_log_folder),
             ReleaseLabel="emr-5.30.0",
             Instances=instances,
             Steps=steps,
