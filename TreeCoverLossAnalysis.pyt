@@ -25,8 +25,10 @@ class TreeCoverLossAnalysis(object):
     tsv_path = os.getenv("LOCALAPPDATA")
     tsv_file = None  # "treecoverloss.tsv"
     tsv_fullpath = None  # os.path.join(tsv_path, tsv_file)
-    tsv_s3_folder = "2018_updates/tsv"
-    tsv_s3_bucket = "gfw-files"
+    s3_in_folder = "geotrellis/input_features"
+    s3_out_folder = "geotrellis/results"
+    s3_log_folder = "geotrellis/logs"
+    s3_bucket = "wri-users"
     sr = arcpy.SpatialReference(4326)
 
     def __init__(self):
@@ -34,6 +36,8 @@ class TreeCoverLossAnalysis(object):
         self.label = "Tree Cover Loss Analysis"
         self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
         self.canRunInBackground = False
+        self.aws_account_name = boto3.client('sts').get_caller_identity().get("Arn").split("/")[1]
+        self.s3_in_features_prefix = f"{self.aws_account_name}/{self.s3_in_folder}/{self.tsv_file}"
 
     def getParameterInfo(self):
         """Define parameter definitions"""
@@ -103,8 +107,8 @@ class TreeCoverLossAnalysis(object):
         )
 
         worker_instance_type.filter.type = "ValueList"
-        worker_instance_type.filter.list = ["r3.2xlarge", "r4.2xlarge", "r5.2xlarge"]
-        worker_instance_type.value = "r4.2xlarge"
+        worker_instance_type.filter.list = ["r4.2xlarge", "r5.2xlarge"]
+        worker_instance_type.value = "r5.2xlarge"
 
         instance_count = arcpy.Parameter(
             displayName="Number of workers",
@@ -126,7 +130,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "0.9.0"
+        jar_version.value = "1.1.0"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -209,10 +213,7 @@ class TreeCoverLossAnalysis(object):
             self._load_layer(messages)
         self._export_wbk(messages)
         self._upload_to_s3(messages)
-        self._launch_emr(
-            "s3://{}/{}/{}".format(
-                self.tsv_s3_bucket, self.tsv_s3_folder, self.tsv_file
-            ),
+        self._launch_emr(f"s3://{self.s3_bucket}/{self.s3_in_features_prefix}",
             tcd,
             tcd_year,
             primary_forests,
@@ -304,8 +305,8 @@ class TreeCoverLossAnalysis(object):
         s3 = boto3.resource("s3")
         s3.meta.client.upload_file(
             self.tsv_fullpath,
-            self.tsv_s3_bucket,
-            "{}/{}".format(self.tsv_s3_folder, self.tsv_file),
+            self.s3_bucket,
+            self.s3_in_features_prefix,
         )
 
     def _launch_emr(
@@ -392,13 +393,11 @@ class TreeCoverLossAnalysis(object):
                         "cluster",
                         "--class",
                         "org.globalforestwatch.treecoverloss.TreeLossSummaryMain",
-                        "s3://gfw-files/2018_update/spark/jars/treecoverloss-assembly-{}.jar".format(
-                            jar_version
-                        ),
+                        f"s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{jar_version}.jar",
                         "--features",
                         in_features,
                         "--output",
-                        "s3://gfw-files/2018_update/results",
+                        f"s3://{self.s3_bucket}/{self.aws_account_name}/{self.s3_out_folder}",
                         "--tcd",
                         str(tcd_year),
                     ]
@@ -471,8 +470,8 @@ class TreeCoverLossAnalysis(object):
 
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
-            LogUri="s3://gfw-files/2018_update/spark/logs",
-            ReleaseLabel="emr-5.24.0",
+            LogUri=f"s3://{self.s3_bucket}/{self.aws_account_name}/{self.s3_log_folder}",
+            ReleaseLabel="emr-5.30.0",
             Instances=instances,
             Steps=steps,
             Applications=applications,
