@@ -18,7 +18,6 @@ class Toolbox(object):
 
 
 class TreeCoverLossAnalysis(object):
-
     out_features_path = None  # r"in_memory\out_features"
     fishnet_path = r"in_memory\fishnet"
     loss_extent_path = r"in_memory\loss_extent"
@@ -37,7 +36,7 @@ class TreeCoverLossAnalysis(object):
         self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
         self.canRunInBackground = False
         self.aws_account_name = boto3.client('sts').get_caller_identity().get("Arn").split("/")[1]
-        self.s3_in_features_prefix = "{}/{}/{}".format(self.aws_account_name,self.s3_in_folder,self.tsv_file)
+        self.s3_in_features_prefix = "{}/{}/{}".format(self.aws_account_name, self.s3_in_folder)
 
     def getParameterInfo(self):
         """Define parameter definitions"""
@@ -213,16 +212,16 @@ class TreeCoverLossAnalysis(object):
             self._load_layer(messages)
         self._export_wbk(messages)
         self._upload_to_s3(messages)
-        self._launch_emr("s3://{}/{}".format(self.s3_bucket, self.s3_in_features_prefix),
-            tcd,
-            tcd_year,
-            primary_forests,
-            master_instance_type,
-            worker_instance_type,
-            worker_instance_count,
-            jar_version,
-            messages,
-        )
+        self._launch_emr("s3://{}/{}/{}".format(self.s3_bucket, self.s3_in_features_prefix, self.tsv_file),
+                         tcd,
+                         tcd_year,
+                         primary_forests,
+                         master_instance_type,
+                         worker_instance_type,
+                         worker_instance_count,
+                         jar_version,
+                         messages,
+                         )
         self._clean_up(add_features_to_map, messages)
 
         messages.addMessage(
@@ -293,7 +292,7 @@ class TreeCoverLossAnalysis(object):
         with open(self.tsv_fullpath, "a+") as output_file:
 
             with arcpy.da.SearchCursor(
-                self.out_features_path, [id_field, "SHAPE@WKB"]
+                    self.out_features_path, [id_field, "SHAPE@WKB"]
             ) as cursor:
                 for row in cursor:
                     gid = row[0]
@@ -306,20 +305,20 @@ class TreeCoverLossAnalysis(object):
         s3.meta.client.upload_file(
             self.tsv_fullpath,
             self.s3_bucket,
-            self.s3_in_features_prefix,
+            "{}/{}".format(self.s3_in_features_prefix, self.tsv_file),
         )
 
     def _launch_emr(
-        self,
-        in_features,
-        tcd,
-        tcd_year,
-        primary_forests,
-        master_instance_type,
-        worker_instance_type,
-        worker_instance_count,
-        jar_version,
-        messages,
+            self,
+            in_features,
+            tcd,
+            tcd_year,
+            primary_forests,
+            master_instance_type,
+            worker_instance_type,
+            worker_instance_count,
+            jar_version,
+            messages,
     ):
 
         messages.addMessage("Start Cluster")
@@ -388,24 +387,24 @@ class TreeCoverLossAnalysis(object):
                 "HadoopJarStep": {
                     "Jar": "command-runner.jar",
                     "Args": [
-                        "spark-submit",
-                        "--deploy-mode",
-                        "cluster",
-                        "--class",
-                        "org.globalforestwatch.summarystats.SummaryMain",
-                        "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(jar_version),
-                        "--analysis",
-                        "treecoverloss"
-                        "--features",
-                        in_features,
-                        "--output",
-                        "s3://{}/{}/{}".format(self.s3_bucket,self.aws_account_name,self.s3_out_folder),
-                        "--tcd",
-                        str(tcd_year),
-                    ]
-                    + [
-                        item
-                        for sublist in list(
+                                "spark-submit",
+                                "--deploy-mode",
+                                "cluster",
+                                "--class",
+                                "org.globalforestwatch.summarystats.SummaryMain",
+                                "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(jar_version),
+                                "--analysis",
+                                "treecoverloss"
+                                "--features",
+                                in_features,
+                                "--output",
+                                "s3://{}/{}/{}".format(self.s3_bucket, self.aws_account_name, self.s3_out_folder),
+                                "--tcd",
+                                str(tcd_year),
+                            ]
+                            + [
+                                item
+                                for sublist in list(
                             map(
                                 list,
                                 zip(
@@ -414,8 +413,8 @@ class TreeCoverLossAnalysis(object):
                                 ),
                             )
                         )
-                        for item in sublist
-                    ],
+                                for item in sublist
+                            ],
                 },
             }
         ]
