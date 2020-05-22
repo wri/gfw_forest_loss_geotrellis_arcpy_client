@@ -36,7 +36,7 @@ class TreeCoverLossAnalysis(object):
         self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
         self.canRunInBackground = False
         self.aws_account_name = boto3.client('sts').get_caller_identity().get("Arn").split("/")[1]
-        self.s3_in_features_prefix = "{}/{}/{}".format(self.aws_account_name, self.s3_in_folder)
+        self.s3_in_features_prefix = "{}/{}".format(self.aws_account_name, self.s3_in_folder)
 
     def getParameterInfo(self):
         """Define parameter definitions"""
