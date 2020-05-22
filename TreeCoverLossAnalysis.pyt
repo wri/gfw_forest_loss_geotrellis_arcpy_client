@@ -394,7 +394,7 @@ class TreeCoverLossAnalysis(object):
                                 "org.globalforestwatch.summarystats.SummaryMain",
                                 "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(jar_version),
                                 "--analysis",
-                                "treecoverloss"
+                                "treecoverloss",
                                 "--features",
                                 in_features,
                                 "--output",
