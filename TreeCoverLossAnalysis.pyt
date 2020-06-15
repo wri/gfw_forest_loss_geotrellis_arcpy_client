@@ -290,7 +290,7 @@ class TreeCoverLossAnalysis(object):
             os.remove(self.tsv_fullpath)
 
         with open(self.tsv_fullpath, "a+") as output_file:
-
+            output_file.write("fid\tgeom\n")
             with arcpy.da.SearchCursor(
                     self.out_features_path, [id_field, "SHAPE@WKB"]
             ) as cursor:
