@@ -83,6 +83,15 @@ class TreeCoverLossAnalysis(object):
         )
         primary_forests.value = False
 
+        plantations = arcpy.Parameter(
+            displayName="Include Plantations",
+            name="plantations",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+        )
+        plantations.value = False
+
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
             name="master_instance_type",
@@ -129,7 +138,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.1.0"
+        jar_version.value = "1.2.0"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -157,6 +166,7 @@ class TreeCoverLossAnalysis(object):
             tcd,
             tcd_year,
             primary_forests,
+            plantations,
             master_instance_type,
             worker_instance_type,
             instance_count,
@@ -192,13 +202,14 @@ class TreeCoverLossAnalysis(object):
         tcd = parameters[1].values
         tcd_year = parameters[2].value
         primary_forests = parameters[3].value
-        master_instance_type = parameters[4].value
-        worker_instance_type = parameters[5].value
-        worker_instance_count = parameters[6].value
-        jar_version = parameters[7].valueAsText
+        plantations = parameters[4].value
+        master_instance_type = parameters[5].value
+        worker_instance_type = parameters[6].value
+        worker_instance_count = parameters[7].value
+        jar_version = parameters[8].valueAsText
 
-        self.out_features_path = parameters[8].valueAsText
-        add_features_to_map = parameters[9].value
+        self.out_features_path = parameters[9].valueAsText
+        add_features_to_map = parameters[10].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -216,6 +227,7 @@ class TreeCoverLossAnalysis(object):
                          tcd,
                          tcd_year,
                          primary_forests,
+                         plantations,
                          master_instance_type,
                          worker_instance_type,
                          worker_instance_count,
@@ -314,6 +326,7 @@ class TreeCoverLossAnalysis(object):
             tcd,
             tcd_year,
             primary_forests,
+            plantations,
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
@@ -420,7 +433,9 @@ class TreeCoverLossAnalysis(object):
         ]
 
         if primary_forests:
-            steps[0]["HadoopJarStep"]["Args"].append("--primary-forests")
+            steps[0]["HadoopJarStep"]["Args"].extend(["--contextual_layer", "is__umd_regional_primary_forest_2001"])
+        if plantations:
+            steps[0]["HadoopJarStep"]["Args"].extend(["--contextual_layer", "is__gfw_plantations"])
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
 

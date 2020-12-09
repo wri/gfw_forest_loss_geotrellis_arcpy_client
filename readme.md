@@ -41,7 +41,10 @@ your virtual environment.
 2. Select the input feature for which you want to run the analysis.
 3. Select the tree cover density threshold for which you want to compute the analysis.
 You can select  more than one threshold.
-4. Optionally, you can change the number of nodes for your EMR cluster. Default size is 1 master and 4 workers.
+4. Select if you want to include Primary Forest and/or Plantations in your analysis.
+This will dis-aggregate loss by the selected layers.
+You will end up with multiple rows per feature and tree cover densisty threshold.
+5. Optionally, you can change the number of nodes for your EMR cluster. Default size is 1 master and 4 workers.
 
 ## Results
 
