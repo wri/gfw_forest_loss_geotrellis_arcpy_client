@@ -297,7 +297,7 @@ class TreeCoverLossAnalysis(object):
                 for row in cursor:
                     gid = row[0]
                     wkb = binascii.hexlify(row[1])
-                    output_file.write(str(gid) + "\t" + wkb + "\n")
+                    output_file.write(str(gid) + "\t" + wkb.decode('utf-8') + "\n")
 
     def _upload_to_s3(self, messages):
         messages.addMessage("Upload to S3")
