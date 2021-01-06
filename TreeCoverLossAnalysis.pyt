@@ -92,6 +92,15 @@ class TreeCoverLossAnalysis(object):
         )
         plantations.value = False
 
+        carbonflux = arcpy.Parameter(
+            displayName="Analyze forest carbon flux model (emissions, removals, net flux)",
+            name="carbonflux",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+        )
+        carbonflux.value = False
+
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
             name="master_instance_type",
@@ -138,7 +147,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.2.1"
+        jar_version.value = "1.3.1"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -148,9 +157,14 @@ class TreeCoverLossAnalysis(object):
             direction="Output",
         )
 
-        out_features.value = r"in_memory\treecoverloss_{}".format(
-            datetime.now().strftime("%Y%m%d%H%M%S")
-        )
+        if carbonflux:
+            out_features.value = r"in_memory\carbonflux_minimal_{}".format(
+                    datetime.now().strftime("%Y%m%d%H%M%S")
+            )
+        else:
+            out_features.value = r"in_memory\treecoverloss_{}".format(
+                datetime.now().strftime("%Y%m%d%H%M%S")
+            )
 
         add_features_to_map = arcpy.Parameter(
             displayName="Add features to map",
@@ -167,6 +181,7 @@ class TreeCoverLossAnalysis(object):
             tcd_year,
             primary_forests,
             plantations,
+            carbonflux,
             master_instance_type,
             worker_instance_type,
             instance_count,
@@ -203,13 +218,14 @@ class TreeCoverLossAnalysis(object):
         tcd_year = parameters[2].value
         primary_forests = parameters[3].value
         plantations = parameters[4].value
-        master_instance_type = parameters[5].value
-        worker_instance_type = parameters[6].value
-        worker_instance_count = parameters[7].value
-        jar_version = parameters[8].valueAsText
+        carbonflux = parameters[5].value
+        master_instance_type = parameters[6].value
+        worker_instance_type = parameters[7].value
+        worker_instance_count = parameters[8].value
+        jar_version = parameters[9].valueAsText
 
-        self.out_features_path = parameters[9].valueAsText
-        add_features_to_map = parameters[10].value
+        self.out_features_path = parameters[10].valueAsText
+        add_features_to_map = parameters[11].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -221,13 +237,14 @@ class TreeCoverLossAnalysis(object):
         self._chop_geometries(messages)
         if add_features_to_map:
             self._load_layer(messages)
-        self._export_wbk(messages)
+        self._export_wkb(messages)
         self._upload_to_s3(messages)
         self._launch_emr("s3://{}/{}/{}".format(self.s3_bucket, self.s3_in_features_prefix, self.tsv_file),
                          tcd,
                          tcd_year,
                          primary_forests,
                          plantations,
+                         carbonflux,
                          master_instance_type,
                          worker_instance_type,
                          worker_instance_count,
@@ -288,7 +305,7 @@ class TreeCoverLossAnalysis(object):
         layer = arcpy.mapping.Layer(self.out_features_path)
         arcpy.mapping.AddLayer(df, layer, "AUTO_ARRANGE")
 
-    def _export_wbk(self, messages):
+    def _export_wkb(self, messages):
 
         messages.addMessage("Export to WKB")
 
@@ -327,6 +344,7 @@ class TreeCoverLossAnalysis(object):
             tcd_year,
             primary_forests,
             plantations,
+            carbonflux,
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
@@ -406,8 +424,6 @@ class TreeCoverLossAnalysis(object):
                                 "--class",
                                 "org.globalforestwatch.summarystats.SummaryMain",
                                 "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(jar_version),
-                                "--analysis",
-                                "treecoverloss",
                                 "--features",
                                 in_features,
                                 "--output",
@@ -436,6 +452,11 @@ class TreeCoverLossAnalysis(object):
             steps[0]["HadoopJarStep"]["Args"].extend(["--contextual_layer", "is__umd_regional_primary_forest_2001"])
         if plantations:
             steps[0]["HadoopJarStep"]["Args"].extend(["--contextual_layer", "is__gfw_plantations"])
+
+        if carbonflux:
+            steps[0]["HadoopJarStep"]["Args"].extend(["--analysis", "carbonflux_minimal"])
+        else:
+            steps[0]["HadoopJarStep"]["Args"].extend(["--analysis", "treecoverloss"])
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
 
