@@ -43,8 +43,16 @@ your virtual environment.
 You can select  more than one threshold.
 4. Select if you want to include Primary Forest and/or Plantations in your analysis.
 This will dis-aggregate loss by the selected layers.
-You will end up with multiple rows per feature and tree cover densisty threshold.
-5. Optionally, you can change the number of nodes for your EMR cluster. Default size is 1 master and 4 workers.
+You will end up with multiple rows per feature and tree cover densisty threshold.]
+5. Analysis of the forest carbon flux model is selected by default. This will provide
+   gross emissions, gross removals and net carbon flux from the forest carbon flux model
+   (Harris et al. 2021) instead of the simple emissions from biomass lost. This will include 
+   annual gross emissions, total gross emissions across all modeled years, total gross 
+   removals across all modeled years, and total net flux across all modeled years, 
+   in addition to the data that this client provides by default. 
+   The output csv folder on s3 will be called carbonflux_minimal_[DATESTAMP] instead of
+   treecoverloss_[DATESTAMP].
+6. Optionally, you can change the number of nodes for your EMR cluster. Default size is 1 master and 4 workers.
 
 ## Results
 

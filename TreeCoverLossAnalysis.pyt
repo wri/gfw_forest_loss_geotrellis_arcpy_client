@@ -99,7 +99,7 @@ class TreeCoverLossAnalysis(object):
             parameterType="Required",
             direction="Input",
         )
-        carbonflux.value = False
+        carbonflux.value = True
 
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
@@ -147,7 +147,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.2.1"
+        jar_version.value = "1.3.1"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -157,14 +157,10 @@ class TreeCoverLossAnalysis(object):
             direction="Output",
         )
 
-        if carbonflux:
-            out_features.value = r"in_memory\carbonflux_minimal_{}".format(
-                    datetime.now().strftime("%Y%m%d%H%M%S")
-            )
-        else:
-            out_features.value = r"in_memory\treecoverloss_{}".format(
-                datetime.now().strftime("%Y%m%d%H%M%S")
-            )
+
+        out_features.value = r"in_memory\treecoverloss_{}".format(
+            datetime.now().strftime("%Y%m%d%H%M%S")
+        )
 
         add_features_to_map = arcpy.Parameter(
             displayName="Add features to map",
@@ -469,28 +465,26 @@ class TreeCoverLossAnalysis(object):
             {
                 "Classification": "spark-defaults",
                 "Properties": {
-                    "spark.executor.memory": "6G",
-                    "spark.driver.memory": "6G",
+                    "spark.executor.memory": "5G",
+                    "spark.driver.memory": "5G",
                     "spark.driver.cores": "1",
                     "spark.driver.maxResultSize": "3G",
+                    "spark.yarn.appMasterEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
                     "spark.rdd.compress": "true",
                     "spark.executor.cores": "1",
-                    "spark.sql.shuffle.partitions": "{}".format(
+                    "spark.executorEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
+                    "spark.sql.shuffle.partitions": str(
                         (70 * worker_instance_count) - 1
                     ),
+                    "spark.executor.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                     "spark.shuffle.spill.compress": "true",
                     "spark.shuffle.compress": "true",
-                    "spark.default.parallelism": "{}".format(
-                        (70 * worker_instance_count) - 1
-                    ),
+                    "spark.default.parallelism": str((70 * worker_instance_count) - 1),
+                    "spark.executor.memoryOverhead": "2G",
                     "spark.shuffle.service.enabled": "true",
-                    "spark.executor.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                    "spark.executor.instances": "{}".format(
-                        (7 * worker_instance_count) - 1
-                    ),
-                    "spark.yarn.executor.memoryOverhead": "1G",
-                    "spark.dynamicAllocation.enabled": "false",
-                    "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
+                    "spark.driver.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
+                    "spark.executor.instances": str((7 * worker_instance_count) - 1),
+                    "spark.dynamicAllocation.enabled": "false"
                 },
                 "Configurations": [],
             },
@@ -508,7 +502,7 @@ class TreeCoverLossAnalysis(object):
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
             LogUri="s3://{}/{}/{}".format(self.s3_bucket, self.aws_account_name, self.s3_log_folder),
-            ReleaseLabel="emr-5.30.0",
+            ReleaseLabel="emr-6.1.0",
             Instances=instances,
             Steps=steps,
             Applications=applications,
@@ -516,6 +510,15 @@ class TreeCoverLossAnalysis(object):
             VisibleToAllUsers=True,
             JobFlowRole="EMR_EC2_DefaultRole",
             ServiceRole="EMR_DefaultRole",
+            BootstrapActions=[
+                {
+                    "Name": "Install GDAL",
+                    "ScriptBootstrapAction": {
+                        "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal.sh",
+                        "Args": ["3.1.2"],
+                    },
+                },
+            ],
             Tags=[
                 {"Key": "Project", "Value": "Global Forest Watch"},
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
