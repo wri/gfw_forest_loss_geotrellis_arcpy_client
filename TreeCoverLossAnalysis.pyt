@@ -33,7 +33,10 @@ class TreeCoverLossAnalysis(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
         self.label = "Tree Cover Loss Analysis"
-        self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
+        descript_1 = "Tree Cover Loss Analysis running on AWS EMR/Geotrellis. "
+        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain=TRUE). "
+        descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
+        self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
         self.aws_account_name = boto3.client('sts').get_caller_identity().get("Arn").split("/")[1]
         self.s3_in_features_prefix = "{}/{}".format(self.aws_account_name, self.s3_in_folder)
@@ -138,7 +141,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.4.2"
+        jar_version.value = "1.4.3"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
