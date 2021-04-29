@@ -470,6 +470,15 @@ class TreeCoverLossAnalysis(object):
                     "spark.yarn.executor.memoryOverhead": "1G",
                     "spark.dynamicAllocation.enabled": "false",
                     "spark.driver.extraJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
+                    "spark.yarn.appMasterEnv.AWS_REQUEST_PAYER": "requester",
+                    "spark.yarn.executorEnv.AWS_REQUEST_PAYER": "requester",
+                },
+                "Configurations": [],
+            },
+            {
+                "Classification": "emrfs-site",
+                "Properties": {
+                    "fs.s3.useRequesterPaysHeader": "true"
                 },
                 "Configurations": [],
             },
