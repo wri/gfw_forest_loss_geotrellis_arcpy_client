@@ -138,7 +138,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.2.0"
+        jar_version.value = "1.4.6"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -496,7 +496,7 @@ class TreeCoverLossAnalysis(object):
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
             LogUri="s3://{}/{}/{}".format(self.s3_bucket, self.aws_account_name, self.s3_log_folder),
-            ReleaseLabel="emr-5.30.0",
+            ReleaseLabel="emr-6.3.0",
             Instances=instances,
             Steps=steps,
             Applications=applications,
