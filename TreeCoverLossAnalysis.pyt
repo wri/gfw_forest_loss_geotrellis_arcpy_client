@@ -492,6 +492,15 @@ class TreeCoverLossAnalysis(object):
                 "Configurations": [],
             },
         ]
+        bootstrap_actions = [
+            {
+                "Name": "Install GDAL 3.1.2 dependencies",
+                "ScriptBootstrapAction": {
+                    "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal.sh",
+                    "Args": ["3.1.2"]
+                }
+            },
+        ]
 
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
@@ -501,6 +510,7 @@ class TreeCoverLossAnalysis(object):
             Steps=steps,
             Applications=applications,
             Configurations=configurations,
+            BootstrapActions=bootstrap_actions,
             VisibleToAllUsers=True,
             JobFlowRole="EMR_EC2_DefaultRole",
             ServiceRole="EMR_DefaultRole",
