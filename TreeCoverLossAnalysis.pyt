@@ -456,13 +456,13 @@ class TreeCoverLossAnalysis(object):
 
         configurations = [
             {
-                "classification": "spark",
-                "properties": {"maximizeResourceAllocation": "true"},
-                "configurations": [],
+                "Classification": "spark",
+                "Properties": {"maximizeResourceAllocation": "true"},
+                "Configurations": [],
             },
             {
-                "classification": "spark-defaults",
-                "properties": {
+                "Classification": "spark-defaults",
+                "Properties": {
                     "spark.shuffle.spill.compress": "true",
                     "spark.driver.maxResultSize": "3G",
                     "spark.shuffle.compress": "true",
@@ -474,16 +474,16 @@ class TreeCoverLossAnalysis(object):
                     "spark.dynamicAllocation.enabled": "true",
                     "spark.executor.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                 },
-                "configurations": [],
+                "Configurations": [],
             },
             {
-                "classification": "yarn-site",
-                "properties": {
+                "Classification": "yarn-site",
+                "Properties": {
                     "yarn.nodemanager.pmem-check-enabled": "false",
                     "yarn.resourcemanager.am.max-attempts": "1",
                     "yarn.nodemanager.vmem-check-enabled": "false",
                 },
-                "configurations": [],
+                "Configurations": [],
             },
         ]
 
