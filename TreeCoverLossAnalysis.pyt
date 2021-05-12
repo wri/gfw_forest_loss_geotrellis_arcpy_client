@@ -464,6 +464,7 @@ class TreeCoverLossAnalysis(object):
                 "Classification": "spark-defaults",
                 "Properties": {
                     "spark.shuffle.spill.compress": "true",
+                    "spark.yarn.appMasterEnv.AWS_REQUEST_PAYER": "requester",
                     "spark.driver.maxResultSize": "3G",
                     "spark.shuffle.compress": "true",
                     "spark.yarn.appMasterEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
@@ -471,6 +472,7 @@ class TreeCoverLossAnalysis(object):
                     "spark.shuffle.service.enabled": "true",
                     "spark.driver.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                     "spark.executorEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
+                    "spark.executorEnv.AWS_REQUEST_PAYER": "requester",
                     "spark.dynamicAllocation.enabled": "true",
                     "spark.executor.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                 },
@@ -483,6 +485,11 @@ class TreeCoverLossAnalysis(object):
                     "yarn.resourcemanager.am.max-attempts": "1",
                     "yarn.nodemanager.vmem-check-enabled": "false",
                 },
+                "Configurations": [],
+            },
+            {
+                "Classification": "emrfs-site",
+                "Properties": {"fs.s3.useRequesterPaysHeader": "true"},
                 "Configurations": [],
             },
         ]
