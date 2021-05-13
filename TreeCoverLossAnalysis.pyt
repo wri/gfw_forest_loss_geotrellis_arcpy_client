@@ -38,8 +38,12 @@ class TreeCoverLossAnalysis(object):
         descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
-        self.aws_account_name = boto3.client('sts').get_caller_identity().get("Arn").split("/")[1]
-        self.s3_in_features_prefix = "{}/{}".format(self.aws_account_name, self.s3_in_folder)
+        self.aws_account_name = (
+            boto3.client("sts").get_caller_identity().get("Arn").split("/")[1]
+        )
+        self.s3_in_features_prefix = "{}/{}".format(
+            self.aws_account_name, self.s3_in_folder
+        )
 
     def getParameterInfo(self):
         """Define parameter definitions"""
@@ -141,7 +145,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.4.3"
+        jar_version.value = "1.4.6"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -226,17 +230,20 @@ class TreeCoverLossAnalysis(object):
             self._load_layer(messages)
         self._export_wbk(messages)
         self._upload_to_s3(messages)
-        self._launch_emr("s3://{}/{}/{}".format(self.s3_bucket, self.s3_in_features_prefix, self.tsv_file),
-                         tcd,
-                         tcd_year,
-                         primary_forests,
-                         plantations,
-                         master_instance_type,
-                         worker_instance_type,
-                         worker_instance_count,
-                         jar_version,
-                         messages,
-                         )
+        self._launch_emr(
+            "s3://{}/{}/{}".format(
+                self.s3_bucket, self.s3_in_features_prefix, self.tsv_file
+            ),
+            tcd,
+            tcd_year,
+            primary_forests,
+            plantations,
+            master_instance_type,
+            worker_instance_type,
+            worker_instance_count,
+            jar_version,
+            messages,
+        )
         self._clean_up(add_features_to_map, messages)
 
         messages.addMessage(
@@ -307,7 +314,7 @@ class TreeCoverLossAnalysis(object):
         with open(self.tsv_fullpath, "a+") as output_file:
             output_file.write("fid\tgeom\n")
             with arcpy.da.SearchCursor(
-                    self.out_features_path, [id_field, "SHAPE@WKB"]
+                self.out_features_path, [id_field, "SHAPE@WKB"]
             ) as cursor:
                 for row in cursor:
                     gid = row[0]
@@ -324,17 +331,17 @@ class TreeCoverLossAnalysis(object):
         )
 
     def _launch_emr(
-            self,
-            in_features,
-            tcd,
-            tcd_year,
-            primary_forests,
-            plantations,
-            master_instance_type,
-            worker_instance_type,
-            worker_instance_count,
-            jar_version,
-            messages,
+        self,
+        in_features,
+        tcd,
+        tcd_year,
+        primary_forests,
+        plantations,
+        master_instance_type,
+        worker_instance_type,
+        worker_instance_count,
+        jar_version,
+        messages,
     ):
 
         messages.addMessage("Start Cluster")
@@ -403,24 +410,28 @@ class TreeCoverLossAnalysis(object):
                 "HadoopJarStep": {
                     "Jar": "command-runner.jar",
                     "Args": [
-                                "spark-submit",
-                                "--deploy-mode",
-                                "cluster",
-                                "--class",
-                                "org.globalforestwatch.summarystats.SummaryMain",
-                                "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(jar_version),
-                                "--analysis",
-                                "treecoverloss",
-                                "--features",
-                                in_features,
-                                "--output",
-                                "s3://{}/{}/{}".format(self.s3_bucket, self.aws_account_name, self.s3_out_folder),
-                                "--tcd",
-                                str(tcd_year),
-                            ]
-                            + [
-                                item
-                                for sublist in list(
+                        "spark-submit",
+                        "--deploy-mode",
+                        "cluster",
+                        "--class",
+                        "org.globalforestwatch.summarystats.SummaryMain",
+                        "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(
+                            jar_version
+                        ),
+                        "--analysis",
+                        "treecoverloss",
+                        "--features",
+                        in_features,
+                        "--output",
+                        "s3://{}/{}/{}".format(
+                            self.s3_bucket, self.aws_account_name, self.s3_out_folder
+                        ),
+                        "--tcd",
+                        str(tcd_year),
+                    ]
+                    + [
+                        item
+                        for sublist in list(
                             map(
                                 list,
                                 zip(
@@ -429,16 +440,20 @@ class TreeCoverLossAnalysis(object):
                                 ),
                             )
                         )
-                                for item in sublist
-                            ],
+                        for item in sublist
+                    ],
                 },
             }
         ]
 
         if primary_forests:
-            steps[0]["HadoopJarStep"]["Args"].extend(["--contextual_layer", "is__umd_regional_primary_forest_2001"])
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__umd_regional_primary_forest_2001"]
+            )
         if plantations:
-            steps[0]["HadoopJarStep"]["Args"].extend(["--contextual_layer", "is__gfw_plantations"])
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__gfw_plantations"]
+            )
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
 
@@ -451,16 +466,18 @@ class TreeCoverLossAnalysis(object):
             {
                 "Classification": "spark-defaults",
                 "Properties": {
+                    "spark.shuffle.spill.compress": "true",
+                    "spark.yarn.appMasterEnv.AWS_REQUEST_PAYER": "requester",
                     "spark.driver.maxResultSize": "3G",
+                    "spark.shuffle.compress": "true",
                     "spark.yarn.appMasterEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
                     "spark.rdd.compress": "true",
-                    "spark.executorEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
-                    "spark.executor.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
-                    "spark.shuffle.spill.compress": "true",
-                    "spark.shuffle.compress": "true",
                     "spark.shuffle.service.enabled": "true",
                     "spark.driver.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
+                    "spark.executorEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
+                    "spark.executorEnv.AWS_REQUEST_PAYER": "requester",
                     "spark.dynamicAllocation.enabled": "true",
+                    "spark.executor.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                 },
                 "Configurations": [],
             },
@@ -473,28 +490,37 @@ class TreeCoverLossAnalysis(object):
                 },
                 "Configurations": [],
             },
+            {
+                "Classification": "emrfs-site",
+                "Properties": {"fs.s3.useRequesterPaysHeader": "true"},
+                "Configurations": [],
+            },
+        ]
+
+        bootstrap_actions = [
+            {
+                "Name": "Install GDAL 3.1.2 dependencies",
+                "ScriptBootstrapAction": {
+                    "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal.sh",
+                    "Args": ["3.1.2"],
+                },
+            },
         ]
 
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
-            LogUri="s3://{}/{}/{}".format(self.s3_bucket, self.aws_account_name, self.s3_log_folder),
-            ReleaseLabel="emr-6.1.0",
+            LogUri="s3://{}/{}/{}".format(
+                self.s3_bucket, self.aws_account_name, self.s3_log_folder
+            ),
+            ReleaseLabel="emr-6.3.0",
             Instances=instances,
             Steps=steps,
             Applications=applications,
             Configurations=configurations,
+            BootstrapActions=bootstrap_actions,
             VisibleToAllUsers=True,
             JobFlowRole="EMR_EC2_DefaultRole",
             ServiceRole="EMR_DefaultRole",
-            BootstrapActions=[
-                {
-                    "Name": "Install GDAL",
-                    "ScriptBootstrapAction": {
-                        "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal.sh",
-                        "Args": ["3.1.2"],
-                    },
-                },
-            ],
             Tags=[
                 {"Key": "Project", "Value": "Global Forest Watch"},
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
