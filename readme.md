@@ -48,9 +48,21 @@ You will end up with multiple rows per feature and tree cover densisty threshold
 
 ## Results
 
-Once the analysis completes, your results will be storted on S3 (see path above).
-Results are stored as CSV file. There will be one row per feature and selected
+Once the analysis completes, your results will be stored on S3 (see path above).
+Results are stored as a CSV file. There will be one row per feature and selected
 treecover density threshold.
+
+Forest carbon flux model (Harris et al. 2021 NCC) (gross emissions, gross removals, net flux)
+shown in this tool are for (TCD>X OR Hansen gain=TRUE) because the flux model includes all Hansen gain pixels. 
+In other words, the flux model results include not just pixels above the requested TCD threshold but also all 
+Hansen gain pixels. Geotrellis is set to count both of these without double-counting gain pixels.
+The non-flux model outputs of this tool (tree cover extent, biomass, tree cover loss, etc.) use the pure tree cover
+density threshold without including all gain pixels (the standard way of getting zonal statistics by TCD).
+Thus, flux model results and non-flux model results are reported over slightly different sets of pixels within the 
+submitted polygons and flux model results should not be divided by non-flux model results 
+(e.g., do not divide gross removals by tree cover extent to get removals per hectare).
+Results from the forest carbon flux model (Harris et al. 2021 NCC) (gross emissions, gross removals, net flux) 
+should only be used for TCD>30 because model results are not reliable for TCD<30. 
 
 The tool will you the object ID of the features as row identifier.
 

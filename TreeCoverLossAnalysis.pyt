@@ -33,7 +33,10 @@ class TreeCoverLossAnalysis(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
         self.label = "Tree Cover Loss Analysis"
-        self.description = "Tree Cover Loss Analysis running on AWS EMR/ Geotrellis"
+        descript_1 = "Tree Cover Loss Analysis running on AWS EMR/Geotrellis. "
+        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain=TRUE). "
+        descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
+        self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
         self.aws_account_name = (
             boto3.client("sts").get_caller_identity().get("Arn").split("/")[1]
@@ -309,14 +312,14 @@ class TreeCoverLossAnalysis(object):
             os.remove(self.tsv_fullpath)
 
         with open(self.tsv_fullpath, "a+") as output_file:
-
+            output_file.write("fid\tgeom\n")
             with arcpy.da.SearchCursor(
                 self.out_features_path, [id_field, "SHAPE@WKB"]
             ) as cursor:
                 for row in cursor:
                     gid = row[0]
                     wkb = binascii.hexlify(row[1])
-                    output_file.write(str(gid) + "\t" + wkb + "\n")
+                    output_file.write(str(gid) + "\t" + wkb.decode('utf-8') + "\n")
 
     def _upload_to_s3(self, messages):
         messages.addMessage("Upload to S3")
