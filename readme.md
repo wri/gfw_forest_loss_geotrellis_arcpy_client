@@ -1,12 +1,13 @@
 # Forest Loss Analysis
 
 This is an ArcPy Python Toolbox which preprocesses vector data and launches
-GFW Tree Cover Loss Analysis on AWS EMR/ Spark from within ArcMap or ArcGIS Pro.
-You can select your feature class in ArcMap/ ArcPro. The toolbox will preprocess your data,
-and split features into smaller chunks for better partitioning. It then export your data
-as TSV file and uploads it to S3.
-Afterwards it launches a SPARK cluster on AWS EMR and runs the GFW tree cover analysis.
-The last step is asynchronous. The toolbox exits while the cluster is still running.
+GFW Tree Cover Loss Analysis on AWS EMR/Spark from within ArcMap or ArcGIS Pro.
+You can select your feature class in ArcMap/ArcPro. The toolbox will preprocess your data,
+and split features into smaller chunks for better partitioning in EMR. 
+It then exports your data as TSV file and uploads it to S3.
+Then, it launches a SPARK cluster on AWS EMR and runs the GFW tree cover analysis.
+The last step is asynchronous; the toolbox exits while the cluster is still running.
+It can take about 10-12 minutes for a cluster to acquire its resource and install software before any analysis begins.
 
 You can monitor progress directly on AWS EMR console. Final results will be stored on S3 in your user folder.
 
@@ -41,10 +42,11 @@ your virtual environment.
 2. Select the input feature for which you want to run the analysis.
 3. Select the tree cover density threshold for which you want to compute the analysis.
 You can select  more than one threshold.
-4. Select if you want to include Primary Forest and/or Plantations in your analysis.
+4. Select if you want to include Primary Forest and/or Plantations as contextual layers in your analysis.
 This will dis-aggregate loss by the selected layers.
 You will end up with multiple rows per feature and tree cover densisty threshold.
-5. Optionally, you can change the number of nodes for your EMR cluster. Default size is 1 master and 4 workers.
+5. Select if you want to analyze aboveground carbon, belowground carbon, and soil carbon stocks in 2000 (megagrams of carbon).   
+6. Optionally, you can change the number of nodes for your EMR cluster. Default size is 1 master and 4 workers.
 
 ## Results
 
@@ -56,8 +58,8 @@ Forest carbon flux model (Harris et al. 2021 NCC) (gross emissions, gross remova
 shown in this tool are for (TCD>X OR Hansen gain=TRUE) because the flux model includes all Hansen gain pixels. 
 In other words, the flux model results include not just pixels above the requested TCD threshold but also all 
 Hansen gain pixels. Geotrellis is set to count both of these without double-counting gain pixels.
-The non-flux model outputs of this tool (tree cover extent, biomass, tree cover loss, etc.) use the pure tree cover
-density threshold without including all gain pixels (the standard way of getting zonal statistics by TCD).
+The non-flux model outputs of this tool (tree cover extent, biomass, tree cover loss, carbon stocks in 2000, etc.) 
+use the pure tree cover density threshold without including all gain pixels (the standard way of getting zonal statistics by TCD).
 Thus, flux model results and non-flux model results are reported over slightly different sets of pixels within the 
 submitted polygons and flux model results should not be divided by non-flux model results 
 (e.g., do not divide gross removals by tree cover extent to get removals per hectare).
