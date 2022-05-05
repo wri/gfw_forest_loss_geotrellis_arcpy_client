@@ -154,7 +154,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.5.6"
+        jar_version.value = "2.1.9"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -360,6 +360,14 @@ class TreeCoverLossAnalysis(object):
         messages.addMessage("Start Cluster")
         client = boto3.client("emr", region_name="us-east-1")
 
+        core_instance_count = 1
+        if round(worker_instance_count/5) > 1:
+            core_instance_count = int(round(worker_instance_count/5))
+
+        task_instance_count = 1
+        if round(worker_instance_count*4/5) > 1:
+            task_instance_count = int(round(worker_instance_count*4/5))
+
         instances = {
             "InstanceGroups": [
                 {
@@ -385,9 +393,27 @@ class TreeCoverLossAnalysis(object):
                     "Name": "geotrellis-treecoverloss-cores",
                     "Market": "SPOT",
                     "InstanceRole": "CORE",
-                    # "BidPrice": "0.532",
                     "InstanceType": worker_instance_type,
-                    "InstanceCount": worker_instance_count,
+                    "InstanceCount": core_instance_count,
+                    "EbsConfiguration": {
+                        "EbsBlockDeviceConfigs": [
+                            {
+                                "VolumeSpecification": {
+                                    "VolumeType": "gp2",
+                                    "SizeInGB": 10,
+                                },
+                                "VolumesPerInstance": 1,
+                            }
+                        ],
+                        "EbsOptimized": True,
+                    },
+                },
+                {
+                    "Name": "geotrellis-treecoverloss-tasks",
+                    "Market": "SPOT",
+                    "InstanceRole": "TASK",
+                    "InstanceType": worker_instance_type,
+                    "InstanceCount": task_instance_count,
                     "EbsConfiguration": {
                         "EbsBlockDeviceConfigs": [
                             {
