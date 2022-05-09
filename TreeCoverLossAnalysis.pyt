@@ -391,7 +391,7 @@ class TreeCoverLossAnalysis(object):
                 },
                 {
                     "Name": "geotrellis-treecoverloss-cores",
-                    "Market": "SPOT",
+                    "Market": "ON_DEMAND",
                     "InstanceRole": "CORE",
                     "InstanceType": worker_instance_type,
                     "InstanceCount": core_instance_count,
