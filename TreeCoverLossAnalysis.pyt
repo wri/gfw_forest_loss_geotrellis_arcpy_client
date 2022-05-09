@@ -99,6 +99,15 @@ class TreeCoverLossAnalysis(object):
         )
         plantations.value = False
 
+        carbon_pools = arcpy.Parameter(
+            displayName="Include aboveground, belowground, and soil carbon 2000 stock analyses",
+            name="carbon_pools",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+        )
+        carbon_pools.value = False
+
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
             name="master_instance_type",
@@ -145,7 +154,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "1.4.6"
+        jar_version.value = "2.1.9"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -174,6 +183,7 @@ class TreeCoverLossAnalysis(object):
             tcd_year,
             primary_forests,
             plantations,
+            carbon_pools,
             master_instance_type,
             worker_instance_type,
             instance_count,
@@ -210,13 +220,14 @@ class TreeCoverLossAnalysis(object):
         tcd_year = parameters[2].value
         primary_forests = parameters[3].value
         plantations = parameters[4].value
-        master_instance_type = parameters[5].value
-        worker_instance_type = parameters[6].value
-        worker_instance_count = parameters[7].value
-        jar_version = parameters[8].valueAsText
+        carbon_pools = parameters[5].value
+        master_instance_type = parameters[6].value
+        worker_instance_type = parameters[7].value
+        worker_instance_count = parameters[8].value
+        jar_version = parameters[9].valueAsText
 
-        self.out_features_path = parameters[9].valueAsText
-        add_features_to_map = parameters[10].value
+        self.out_features_path = parameters[10].valueAsText
+        add_features_to_map = parameters[11].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -238,6 +249,7 @@ class TreeCoverLossAnalysis(object):
             tcd_year,
             primary_forests,
             plantations,
+            carbon_pools,
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
@@ -337,6 +349,7 @@ class TreeCoverLossAnalysis(object):
         tcd_year,
         primary_forests,
         plantations,
+        carbon_pools,
         master_instance_type,
         worker_instance_type,
         worker_instance_count,
@@ -346,6 +359,14 @@ class TreeCoverLossAnalysis(object):
 
         messages.addMessage("Start Cluster")
         client = boto3.client("emr", region_name="us-east-1")
+
+        core_instance_count = 1
+        if round(worker_instance_count/5) > 1:
+            core_instance_count = int(round(worker_instance_count/5))
+
+        task_instance_count = 1
+        if round(worker_instance_count*4/5) > 1:
+            task_instance_count = int(round(worker_instance_count*4/5))
 
         instances = {
             "InstanceGroups": [
@@ -370,11 +391,29 @@ class TreeCoverLossAnalysis(object):
                 },
                 {
                     "Name": "geotrellis-treecoverloss-cores",
-                    "Market": "SPOT",
+                    "Market": "ON_DEMAND",
                     "InstanceRole": "CORE",
-                    # "BidPrice": "0.532",
                     "InstanceType": worker_instance_type,
-                    "InstanceCount": worker_instance_count,
+                    "InstanceCount": core_instance_count,
+                    "EbsConfiguration": {
+                        "EbsBlockDeviceConfigs": [
+                            {
+                                "VolumeSpecification": {
+                                    "VolumeType": "gp2",
+                                    "SizeInGB": 10,
+                                },
+                                "VolumesPerInstance": 1,
+                            }
+                        ],
+                        "EbsOptimized": True,
+                    },
+                },
+                {
+                    "Name": "geotrellis-treecoverloss-tasks",
+                    "Market": "SPOT",
+                    "InstanceRole": "TASK",
+                    "InstanceType": worker_instance_type,
+                    "InstanceCount": task_instance_count,
                     "EbsConfiguration": {
                         "EbsBlockDeviceConfigs": [
                             {
@@ -418,7 +457,6 @@ class TreeCoverLossAnalysis(object):
                         "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(
                             jar_version
                         ),
-                        "--analysis",
                         "treecoverloss",
                         "--features",
                         in_features,
@@ -454,6 +492,10 @@ class TreeCoverLossAnalysis(object):
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__gfw_plantations"]
             )
+        if carbon_pools:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--carbon_pools"]
+            )
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
 
@@ -468,6 +510,9 @@ class TreeCoverLossAnalysis(object):
                 "Properties": {
                     "spark.shuffle.spill.compress": "true",
                     "spark.yarn.appMasterEnv.AWS_REQUEST_PAYER": "requester",
+                    "spark.yarn.appMasterEnv.GDAL_HTTP_MAX_RETRY":"10",
+                    "spark.yarn.appMasterEnv.GDAL_HTTP_RETRY_DELAY":"10",
+                    "spark.yarn.appMasterEnv.GDAL_MAX_DATASET_POOL_SIZE":"450",
                     "spark.driver.maxResultSize": "3G",
                     "spark.shuffle.compress": "true",
                     "spark.yarn.appMasterEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
@@ -476,6 +521,9 @@ class TreeCoverLossAnalysis(object):
                     "spark.driver.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                     "spark.executorEnv.LD_LIBRARY_PATH": "/usr/local/miniconda/lib/:/usr/local/lib",
                     "spark.executorEnv.AWS_REQUEST_PAYER": "requester",
+                    "spark.executorEnv.GDAL_HTTP_MAX_RETRY":"10",
+                    "spark.executorEnv.GDAL_HTTP_RETRY_DELAY":"10",
+                    "spark.executorEnv.GDAL_MAX_DATASET_POOL_SIZE":"450",
                     "spark.dynamicAllocation.enabled": "true",
                     "spark.executor.defaultJavaOptions": "-XX:+UseParallelGC -XX:+UseParallelOldGC -XX:OnOutOfMemoryError='kill -9 %p'",
                 },
