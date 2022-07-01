@@ -56,6 +56,14 @@ class TreeCoverLossAnalysis(object):
             direction="Input",
         )
 
+        in_feature_name_column = arcpy.Parameter(
+            displayName="Feature Name Column",
+            name="in_feature_name_column",
+            datatype="GPString",
+            parameterType="Optional",
+            direction="Input",
+        )
+
         tcd = arcpy.Parameter(
             displayName="Tree Cover Density Threshold",
             name="tcd",
@@ -179,6 +187,7 @@ class TreeCoverLossAnalysis(object):
 
         params = [
             in_features,
+            in_feature_name_column,
             tcd,
             tcd_year,
             primary_forests,
@@ -216,18 +225,19 @@ class TreeCoverLossAnalysis(object):
         arcpy.env.outputCoordinateSystem = self.sr
 
         in_features = parameters[0].valueAsText
-        tcd = parameters[1].values
-        tcd_year = parameters[2].value
-        primary_forests = parameters[3].value
-        plantations = parameters[4].value
-        carbon_pools = parameters[5].value
-        master_instance_type = parameters[6].value
-        worker_instance_type = parameters[7].value
-        worker_instance_count = parameters[8].value
-        jar_version = parameters[9].valueAsText
+        in_feature_name_column = parameters[1].valueAsText
+        tcd = parameters[2].values
+        tcd_year = parameters[3].value
+        primary_forests = parameters[4].value
+        plantations = parameters[5].value
+        carbon_pools = parameters[6].value
+        master_instance_type = parameters[7].value
+        worker_instance_type = parameters[8].value
+        worker_instance_count = parameters[9].value
+        jar_version = parameters[10].valueAsText
 
-        self.out_features_path = parameters[10].valueAsText
-        add_features_to_map = parameters[11].value
+        self.out_features_path = parameters[11].valueAsText
+        add_features_to_map = parameters[12].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -236,6 +246,7 @@ class TreeCoverLossAnalysis(object):
 
         self._make_fishnet_layer(messages)
         self._make_loss_extent_layer(messages)
+        """self._make_minimal_fields_layer(message)"""
         self._chop_geometries(messages)
         if add_features_to_map:
             self._load_layer(messages)
@@ -283,7 +294,7 @@ class TreeCoverLossAnalysis(object):
         arcpy.MakeFeatureLayer_management(self.fishnet_path, "fishnet")
 
     def _make_loss_extent_layer(self, messages):
-        messages.addMessage("Load Loss Extent")
+        messages.addMessage("Load loss extent")
         loss_extent_geom = arcpy.AsShape(self.loss_extent, False)
         arcpy.CreateFeatureclass_management(
             "in_memory", "loss_extent", "POLYGON", spatial_reference=self.sr
@@ -292,13 +303,19 @@ class TreeCoverLossAnalysis(object):
         cursor.insertRow([loss_extent_geom])
         arcpy.MakeFeatureLayer_management(self.loss_extent_path, "loss_extent")
 
+    """
+    def _make_minimal_fields_layer(self, messages):
+        messages.addMessage("Create input layer with just desired columns")
+        """Try using this: https://gis.stackexchange.com/questions/185097/selecting-certain-fields-from-feature-class-to-create-new-feature-class-in-arcpy"""
+    """
+
     def _chop_geometries(self, messages):
 
         messages.addMessage("Intersect layers")
         arcpy.Intersect_analysis(
             in_features="in_features 3;loss_extent 1; fishnet 2",
             out_feature_class=self.out_features_path,
-            join_attributes="ONLY_FID",
+            join_attributes="ONLY_FID", """Ultimately want this to be ALL but need to delete unwanted columns first """
             cluster_tolerance="-1 Unknown",
             output_type="INPUT",
         )
@@ -319,6 +336,14 @@ class TreeCoverLossAnalysis(object):
         for field in fields:
             if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
                 id_field = field.name
+
+        """
+        name_field = None
+        fields = arcpy.ListFields(self.out_features_path, wild_card = field_type="Integer")
+        for field in fields:
+            if field.name != "FID_loss_extent" and field.name != "FID_fishnet":
+                name_field = field.name
+        """
 
         if os.path.exists(self.tsv_fullpath):
             os.remove(self.tsv_fullpath)
