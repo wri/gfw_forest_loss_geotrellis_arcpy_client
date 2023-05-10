@@ -21,7 +21,7 @@ You will need a licensed version of ArcMap or ArcGIS Pro to run the toolbox. The
 uses BOTO3 to communicate with AWS. You will need to install this package into your Python
 installation.
 
-Make sure, Boto3 can find your [AWS credentials](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html) and that you have permissions to run jobs on AWS EMR.
+Make sure, Boto3 can find your [AWS credentials](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html) and that you have permissions to run jobs on AWS EMR. See [docs/aws.md](docs/aws.md) for details on the permissions neaded and how to get them.
 
 __ArcMap__
 
