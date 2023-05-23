@@ -5,6 +5,7 @@ from datetime import datetime
 import itertools
 import os
 
+aws_session = boto3.Session(profile_name='sso')
 
 class Toolbox(object):
     def __init__(self):
@@ -39,7 +40,7 @@ class TreeCoverLossAnalysis(object):
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
         self.aws_account_name = (
-            boto3.client("sts").get_caller_identity().get("Arn").split("/")[-1]
+            aws_session.client("sts").get_caller_identity().get("Arn").split("/")[-1]
         )
         self.s3_in_features_prefix = "{}/{}".format(
             self.aws_account_name, self.s3_in_folder
@@ -335,7 +336,7 @@ class TreeCoverLossAnalysis(object):
 
     def _upload_to_s3(self, messages):
         messages.addMessage("Upload to S3")
-        s3 = boto3.resource("s3")
+        s3 = aws_session.resource("s3")
         s3.meta.client.upload_file(
             self.tsv_fullpath,
             self.s3_bucket,
@@ -358,7 +359,7 @@ class TreeCoverLossAnalysis(object):
     ):
 
         messages.addMessage("Start Cluster")
-        client = boto3.client("emr", region_name="us-east-1")
+        client = aws_session.client("emr", region_name="us-east-1")
 
         core_instance_count = 1
         if round(worker_instance_count/5) > 1:
