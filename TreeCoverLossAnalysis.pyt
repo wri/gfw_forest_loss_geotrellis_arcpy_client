@@ -5,7 +5,7 @@ from datetime import datetime
 import itertools
 import os
 
-aws_session = boto3.Session(profile_name='sso')
+aws_session = boto3.Session(profile_name='default')
 
 class Toolbox(object):
     def __init__(self):
