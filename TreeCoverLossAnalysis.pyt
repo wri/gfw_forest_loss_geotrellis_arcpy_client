@@ -39,7 +39,7 @@ class TreeCoverLossAnalysis(object):
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
         self.aws_account_name = (
-            boto3.client("sts").get_caller_identity().get("Arn").split("/")[1]
+            boto3.client("sts").get_caller_identity().get("Arn").split("/")[-1]
         )
         self.s3_in_features_prefix = "{}/{}".format(
             self.aws_account_name, self.s3_in_folder
