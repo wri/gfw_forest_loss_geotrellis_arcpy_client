@@ -1,6 +1,6 @@
 # AWS resources and permissions
 
-This script depends on several resource that have been set up in WRI's AWS account and requires that the user running the script have the correct permissions.
+This script depends on several resources that have been set up in WRI's AWS account and requires that the user running the script have the correct permissions.
 
 
 ## Permissions [in process]
