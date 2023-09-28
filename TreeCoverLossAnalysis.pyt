@@ -38,11 +38,11 @@ class TreeCoverLossAnalysis(object):
         descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
-        self.aws_account_name = (
-            boto3.client("sts").get_caller_identity().get("Arn").split("/")[1]
+        self.aws_identity_label = (
+            boto3.client("sts").get_caller_identity().get("Arn").split("/")[-1].split("@")[0]
         )
         self.s3_in_features_prefix = "{}/{}".format(
-            self.aws_account_name, self.s3_in_folder
+            self.aws_identity_label, self.s3_in_folder
         )
 
     def getParameterInfo(self):
@@ -462,7 +462,7 @@ class TreeCoverLossAnalysis(object):
                         in_features,
                         "--output",
                         "s3://{}/{}/{}".format(
-                            self.s3_bucket, self.aws_account_name, self.s3_out_folder
+                            self.s3_bucket, self.aws_identity_label, self.s3_out_folder
                         ),
                         "--tcd",
                         str(tcd_year),
@@ -558,7 +558,7 @@ class TreeCoverLossAnalysis(object):
         response = client.run_job_flow(
             Name="Geotrellis Forest Loss Analysis",
             LogUri="s3://{}/{}/{}".format(
-                self.s3_bucket, self.aws_account_name, self.s3_log_folder
+                self.s3_bucket, self.aws_identity_label, self.s3_log_folder
             ),
             ReleaseLabel="emr-6.3.0",
             Instances=instances,
