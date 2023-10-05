@@ -11,7 +11,7 @@ It can take about 10-12 minutes for a cluster to acquire its resource and instal
 
 You can monitor progress directly on AWS EMR console. Final results will be stored on S3 in your user folder.
 
-`s3://wri-users/{your user name}/geotrellis/results/treecoverloss_<date_time>/`
+`s3://wri-users/{your.name}/geotrellis/results/treecoverloss_<date_time>/`
 
 ## Installation and dependencies
 

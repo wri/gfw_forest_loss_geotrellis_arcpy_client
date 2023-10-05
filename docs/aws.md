@@ -1,6 +1,8 @@
 # AWS resources and permissions
 
-This script depends on several resources that have been set up in WRI's AWS account and requires that the user running the script have the correct permissions.
+To use this script and ArcGIS Toolbox you must have been set up with WRI's AWS account and specifically the `ForestResearcher` Single Sign-On group.
+
+Contact a Data Lab cloud administrator to gain the necessary credentials.
 
 
 ## Permissions [in process]
