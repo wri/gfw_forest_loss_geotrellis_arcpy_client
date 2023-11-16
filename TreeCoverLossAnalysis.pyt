@@ -34,7 +34,7 @@ class TreeCoverLossAnalysis(object):
         """Define the tool (tool name is the name of the class)."""
         self.label = "Tree Cover Loss Analysis"
         descript_1 = "Tree Cover Loss Analysis running on AWS EMR/Geotrellis. "
-        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain=TRUE). "
+        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain2000-2020=TRUE OR mangrove=TRUE NOT pre-2000 plantations). "
         descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
@@ -82,22 +82,54 @@ class TreeCoverLossAnalysis(object):
         tcd_year.value = 2000
 
         primary_forests = arcpy.Parameter(
-            displayName="Include Primary Forests",
+            displayName="Humid tropical primary forest 2001 (Turubanova et al. 2018)",
             name="primary_forests",
             datatype="GPBoolean",
             parameterType="Required",
             direction="Input",
+            category="Contextual layers: results by...",
         )
         primary_forests.value = False
 
         plantations = arcpy.Parameter(
-            displayName="Include Plantations",
+            displayName="Planted trees (Spatial Database of Planted Trees v1.0)",
             name="plantations",
             datatype="GPBoolean",
             parameterType="Required",
             direction="Input",
+            category="Contextual layers: results by...",
         )
         plantations.value = False
+
+        global_peat = arcpy.Parameter(
+            displayName="Global peat (aggregated by GFW for carbon flux model, 2023)",
+            name="global_peat",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        global_peat.value = False
+
+        tree_cover_loss_drivers = arcpy.Parameter(
+            displayName="Driver of tree cover loss (Curtis et al. 2018, updated through current year)",
+            name="tree_cover_loss_drivers",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        tree_cover_loss_drivers.value = False
+
+        tree_cover_loss_from_fires = arcpy.Parameter(
+            displayName="Tree cover loss from fires (Tyukavina et al. 2022, updated through current year)",
+            name="tree_cover_loss_from fires",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        tree_cover_loss_from_fires.value = False
 
         carbon_pools = arcpy.Parameter(
             displayName="Include aboveground, belowground, and soil carbon 2000 stock analyses",
@@ -105,8 +137,29 @@ class TreeCoverLossAnalysis(object):
             datatype="GPBoolean",
             parameterType="Required",
             direction="Input",
+            category="Carbon options",
         )
         carbon_pools.value = False
+
+        simple_AGB_emissions = arcpy.Parameter(
+            displayName="Output timeseries of emissions from aboveground biomass loss (old emissions model, pre-Harris et al. 2021)",
+            name="simple_AGB_emissions",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Carbon options",
+        )
+        simple_AGB_emissions.value = False
+
+        emissions_by_gas_annually = arcpy.Parameter(
+            displayName="Output timeseries of emissions from CO2 and non-CO2 (CH4 and N2O) separately (from Harris et al. 2021, updated through current year)",
+            name="emissions_by_gas_annually",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Carbon options",
+        )
+        emissions_by_gas_annually.value = False
 
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
@@ -154,7 +207,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.3.0"
+        jar_version.value = "2.3.13"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -183,7 +236,12 @@ class TreeCoverLossAnalysis(object):
             tcd_year,
             primary_forests,
             plantations,
+            global_peat,
+            tree_cover_loss_drivers,
+            tree_cover_loss_from_fires,
             carbon_pools,
+            simple_AGB_emissions,
+            emissions_by_gas_annually,
             master_instance_type,
             worker_instance_type,
             instance_count,
@@ -220,14 +278,19 @@ class TreeCoverLossAnalysis(object):
         tcd_year = parameters[2].value
         primary_forests = parameters[3].value
         plantations = parameters[4].value
-        carbon_pools = parameters[5].value
-        master_instance_type = parameters[6].value
-        worker_instance_type = parameters[7].value
-        worker_instance_count = parameters[8].value
-        jar_version = parameters[9].valueAsText
+        global_peat = parameters[5].value
+        tree_cover_loss_drivers = parameters[6].value
+        tree_cover_loss_from_fires = parameters[7].value
+        carbon_pools = parameters[8].value
+        simple_AGB_emissions = parameters[9].value
+        emissions_by_gas_annually = parameters[10].value
+        master_instance_type = parameters[11].value
+        worker_instance_type = parameters[12].value
+        worker_instance_count = parameters[13].value
+        jar_version = parameters[14].valueAsText
 
-        self.out_features_path = parameters[10].valueAsText
-        add_features_to_map = parameters[11].value
+        self.out_features_path = parameters[15].valueAsText
+        add_features_to_map = parameters[16].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -249,7 +312,12 @@ class TreeCoverLossAnalysis(object):
             tcd_year,
             primary_forests,
             plantations,
+            global_peat,
+            tree_cover_loss_drivers,
+            tree_cover_loss_from_fires,
             carbon_pools,
+            simple_AGB_emissions,
+            emissions_by_gas_annually,
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
@@ -349,7 +417,12 @@ class TreeCoverLossAnalysis(object):
         tcd_year,
         primary_forests,
         plantations,
+        global_peat,
+        tree_cover_loss_drivers,
+        tree_cover_loss_from_fires,
         carbon_pools,
+        simple_AGB_emissions,
+        emissions_by_gas_annually,
         master_instance_type,
         worker_instance_type,
         worker_instance_count,
@@ -492,9 +565,30 @@ class TreeCoverLossAnalysis(object):
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__gfw_plantations"]
             )
+        if global_peat:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__global_peat"]
+            )
+        if tree_cover_loss_drivers:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "tcl_driver__class"]
+            )
+        if tree_cover_loss_from_fires:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__tree_cover_loss_from_fires"]
+            )
+
         if carbon_pools:
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--carbon_pools"]
+            )
+        if simple_AGB_emissions:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--simple_agb_emissions"]
+            )
+        if emissions_by_gas_annually:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--emissions_by_gas_annually"]
             )
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
