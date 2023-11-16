@@ -151,15 +151,15 @@ class TreeCoverLossAnalysis(object):
         )
         simple_AGB_emissions.value = False
 
-        emissions_by_gas_annual = arcpy.Parameter(
+        emissions_by_gas_annually = arcpy.Parameter(
             displayName="Output timeseries of emissions from CO2 and non-CO2 (CH4 and N2O) separately (from Harris et al. 2021, updated through current year)",
-            name="emissions_by_gas_annual",
+            name="emissions_by_gas_annually",
             datatype="GPBoolean",
             parameterType="Required",
             direction="Input",
             category="Carbon options",
         )
-        emissions_by_gas_annual.value = False
+        emissions_by_gas_annually.value = False
 
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
@@ -207,7 +207,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.3.0"
+        jar_version.value = "2.3.13"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -241,7 +241,7 @@ class TreeCoverLossAnalysis(object):
             tree_cover_loss_from_fires,
             carbon_pools,
             simple_AGB_emissions,
-            emissions_by_gas_annual,
+            emissions_by_gas_annually,
             master_instance_type,
             worker_instance_type,
             instance_count,
@@ -283,7 +283,7 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_from_fires = parameters[7].value
         carbon_pools = parameters[8].value
         simple_AGB_emissions = parameters[9].value
-        emissions_by_gas_annual = parameters[10].value
+        emissions_by_gas_annually = parameters[10].value
         master_instance_type = parameters[11].value
         worker_instance_type = parameters[12].value
         worker_instance_count = parameters[13].value
@@ -317,7 +317,7 @@ class TreeCoverLossAnalysis(object):
             tree_cover_loss_from_fires,
             carbon_pools,
             simple_AGB_emissions,
-            emissions_by_gas_annual,
+            emissions_by_gas_annually,
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
@@ -422,7 +422,7 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_from_fires,
         carbon_pools,
         simple_AGB_emissions,
-        emissions_by_gas_annual,
+        emissions_by_gas_annually,
         master_instance_type,
         worker_instance_type,
         worker_instance_count,
@@ -565,9 +565,30 @@ class TreeCoverLossAnalysis(object):
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__gfw_plantations"]
             )
+        if global_peat:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__global_peat"]
+            )
+        if tree_cover_loss_drivers:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "tcl_driver__class"]
+            )
+        if tree_cover_loss_from_fires:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__tree_cover_loss_from_fires"]
+            )
+
         if carbon_pools:
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--carbon_pools"]
+            )
+        if simple_AGB_emissions:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--simple_agb_emissions"]
+            )
+        if emissions_by_gas_annually:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--emissions_by_gas_annually"]
             )
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
