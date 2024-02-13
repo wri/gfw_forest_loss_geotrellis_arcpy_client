@@ -501,18 +501,11 @@ class TreeCoverLossAnalysis(object):
                     },
                 },
             ],
-            "Ec2KeyName": "tmaschler_wri2",
             "KeepJobFlowAliveWhenNoSteps": False,
             "TerminationProtected": False,
             "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
             "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
             "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
-            "AdditionalMasterSecurityGroups": [
-                "sg-d7a0d8ad",
-                "sg-001e5f904c9cb7cc4",
-                "sg-6c6a5911",
-            ],
-            "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
         }
 
         steps = [
