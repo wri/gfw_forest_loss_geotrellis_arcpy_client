@@ -207,7 +207,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.3.13"
+        jar_version.value = "2.3.22"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
