@@ -92,7 +92,7 @@ class TreeCoverLossAnalysis(object):
         primary_forests.value = False
 
         plantations = arcpy.Parameter(
-            displayName="Planted trees (Spatial Database of Planted Trees v1.0)",
+            displayName="Planted trees (Spatial Database of Planted Trees v2.0)",
             name="plantations",
             datatype="GPBoolean",
             parameterType="Required",
@@ -207,7 +207,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.3.22"
+        jar_version.value = "2.3.25"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
