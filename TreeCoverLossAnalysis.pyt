@@ -92,7 +92,7 @@ class TreeCoverLossAnalysis(object):
         primary_forests.value = False
 
         intact_forests = arcpy.Parameter(
-            displayName="Intact Forest Landscapes 2000 (Potapov et al. 2017)",
+            displayName="Intact forest landscapes 2000 (Potapov et al. 2017)",
             name="intacty_forests",
             datatype="GPBoolean",
             parameterType="Required",
@@ -442,9 +442,11 @@ class TreeCoverLossAnalysis(object):
         tcd,
         tcd_year,
         primary_forests,
+        intact_forests,
         plantations,
         global_peat,
-        tree_cover_loss_drivers,
+        is_tree_cover_loss,
+        #tree_cover_loss_drivers,
         tree_cover_loss_from_fires,
         carbon_pools,
         simple_AGB_emissions,
