@@ -93,7 +93,7 @@ class TreeCoverLossAnalysis(object):
 
         intact_forests = arcpy.Parameter(
             displayName="Intact forest landscapes 2000 (Potapov et al. 2017)",
-            name="intacty_forests",
+            name="intact_forests",
             datatype="GPBoolean",
             parameterType="Required",
             direction="Input",
@@ -291,8 +291,7 @@ class TreeCoverLossAnalysis(object):
         intact_forests = parameters[4].value
         plantations = parameters[5].value
         global_peat = parameters[6].value
-        is_tree_cover_loss = parameters[7].value,
-        tree_cover_loss_drivers = parameters[].value
+        tree_cover_loss_drivers = parameters[7].value
         tree_cover_loss_from_fires = parameters[8].value
         carbon_pools = parameters[9].value
         simple_AGB_emissions = parameters[10].value
@@ -302,8 +301,8 @@ class TreeCoverLossAnalysis(object):
         worker_instance_count = parameters[14].value
         jar_version = parameters[15].valueAsText
 
-        self.out_features_path = parameters[15].valueAsText
-        add_features_to_map = parameters[16].value
+        self.out_features_path = parameters[16].valueAsText
+        add_features_to_map = parameters[17].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
