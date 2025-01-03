@@ -141,6 +141,16 @@ class TreeCoverLossAnalysis(object):
         )
         tree_cover_loss_from_fires.value = False
 
+        is__umd_tree_cover_loss = arcpy.Parameter(
+            displayName="Presence/absence of tree cover loss (through 2023)",
+            name="is__umd_tree_cover_loss",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        is__umd_tree_cover_loss.value = False
+
         carbon_pools = arcpy.Parameter(
             displayName="Include aboveground, belowground, and soil carbon 2000 stock analyses",
             name="carbon_pools",
@@ -250,6 +260,7 @@ class TreeCoverLossAnalysis(object):
             global_peat,
             tree_cover_loss_drivers,
             tree_cover_loss_from_fires,
+            is__umd_tree_cover_loss,
             carbon_pools,
             simple_AGB_emissions,
             emissions_by_gas_annually,
@@ -291,18 +302,19 @@ class TreeCoverLossAnalysis(object):
         intact_forests = parameters[4].value
         plantations = parameters[5].value
         global_peat = parameters[6].value
-        tree_cover_loss_drivers = parameters[7].value
-        tree_cover_loss_from_fires = parameters[8].value
-        carbon_pools = parameters[9].value
-        simple_AGB_emissions = parameters[10].value
-        emissions_by_gas_annually = parameters[11].value
-        master_instance_type = parameters[12].value
-        worker_instance_type = parameters[13].value
-        worker_instance_count = parameters[14].value
-        jar_version = parameters[15].valueAsText
+        is__umd_tree_cover_loss = parameters[7].value
+        tree_cover_loss_drivers = parameters[8].value
+        tree_cover_loss_from_fires = parameters[9].value
+        carbon_pools = parameters[10].value
+        simple_AGB_emissions = parameters[11].value
+        emissions_by_gas_annually = parameters[12].value
+        master_instance_type = parameters[13].value
+        worker_instance_type = parameters[14].value
+        worker_instance_count = parameters[15].value
+        jar_version = parameters[16].valueAsText
 
-        self.out_features_path = parameters[16].valueAsText
-        add_features_to_map = parameters[17].value
+        self.out_features_path = parameters[17].valueAsText
+        add_features_to_map = parameters[18].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -328,6 +340,7 @@ class TreeCoverLossAnalysis(object):
             global_peat,
             tree_cover_loss_drivers,
             tree_cover_loss_from_fires,
+            is__umd_tree_cover_loss,
             carbon_pools,
             simple_AGB_emissions,
             emissions_by_gas_annually,
@@ -434,6 +447,7 @@ class TreeCoverLossAnalysis(object):
         global_peat,
         tree_cover_loss_drivers,
         tree_cover_loss_from_fires,
+        is__umd_tree_cover_loss,
         carbon_pools,
         simple_AGB_emissions,
         emissions_by_gas_annually,
@@ -594,6 +608,10 @@ class TreeCoverLossAnalysis(object):
         if tree_cover_loss_from_fires:
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__tree_cover_loss_from_fires"]
+            )
+        if is__umd_tree_cover_loss:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__umd_tree_cover_loss"]
             )
 
         if carbon_pools:
