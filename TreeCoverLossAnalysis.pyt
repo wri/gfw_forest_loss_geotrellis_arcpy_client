@@ -302,9 +302,9 @@ class TreeCoverLossAnalysis(object):
         intact_forests = parameters[4].value
         plantations = parameters[5].value
         global_peat = parameters[6].value
-        is__umd_tree_cover_loss = parameters[7].value
-        tree_cover_loss_drivers = parameters[8].value
-        tree_cover_loss_from_fires = parameters[9].value
+        tree_cover_loss_drivers = parameters[7].value
+        tree_cover_loss_from_fires = parameters[8].value
+        is__umd_tree_cover_loss = parameters[9].value
         carbon_pools = parameters[10].value
         simple_AGB_emissions = parameters[11].value
         emissions_by_gas_annually = parameters[12].value
