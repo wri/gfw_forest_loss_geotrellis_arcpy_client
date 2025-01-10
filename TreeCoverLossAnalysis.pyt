@@ -34,7 +34,7 @@ class TreeCoverLossAnalysis(object):
         """Define the tool (tool name is the name of the class)."""
         self.label = "Tree Cover Loss Analysis"
         descript_1 = "Tree Cover Loss Analysis running on AWS EMR/Geotrellis. "
-        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain2000-2020=TRUE OR mangrove=TRUE NOT pre-2000 plantations). "
+        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain 2000-2020=TRUE OR mangrove=TRUE NOT pre-2000 plantations). "
         descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
@@ -91,6 +91,16 @@ class TreeCoverLossAnalysis(object):
         )
         primary_forests.value = False
 
+        intact_forests = arcpy.Parameter(
+            displayName="Intact forest landscapes 2000 (Potapov et al. 2017)",
+            name="intact_forests",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        intact_forests.value = False
+
         plantations = arcpy.Parameter(
             displayName="Planted trees (Spatial Database of Planted Trees v2.0)",
             name="plantations",
@@ -112,7 +122,7 @@ class TreeCoverLossAnalysis(object):
         global_peat.value = False
 
         tree_cover_loss_drivers = arcpy.Parameter(
-            displayName="Driver of tree cover loss (Curtis et al. 2018, updated through current year)",
+            displayName="DO NOT USE (may not work): Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2022)",
             name="tree_cover_loss_drivers",
             datatype="GPBoolean",
             parameterType="Required",
@@ -130,6 +140,16 @@ class TreeCoverLossAnalysis(object):
             category="Contextual layers: results by...",
         )
         tree_cover_loss_from_fires.value = False
+
+        is__umd_tree_cover_loss = arcpy.Parameter(
+            displayName="Presence/absence of tree cover loss (through 2023)",
+            name="is__umd_tree_cover_loss",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        is__umd_tree_cover_loss.value = False
 
         carbon_pools = arcpy.Parameter(
             displayName="Include aboveground, belowground, and soil carbon 2000 stock analyses",
@@ -152,7 +172,7 @@ class TreeCoverLossAnalysis(object):
         simple_AGB_emissions.value = False
 
         emissions_by_gas_annually = arcpy.Parameter(
-            displayName="Output timeseries of emissions from CO2 and non-CO2 (CH4 and N2O) separately (from Harris et al. 2021, updated through current year)",
+            displayName="Output timeseries of emissions from CO2, CH4, and N2O separately (from Harris et al. 2021, updated through current year)",
             name="emissions_by_gas_annually",
             datatype="GPBoolean",
             parameterType="Required",
@@ -207,7 +227,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.3.25"
+        jar_version.value = "2.4.1_ArcPy_flux_model_v1_4_1"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -235,10 +255,12 @@ class TreeCoverLossAnalysis(object):
             tcd,
             tcd_year,
             primary_forests,
+            intact_forests,
             plantations,
             global_peat,
             tree_cover_loss_drivers,
             tree_cover_loss_from_fires,
+            is__umd_tree_cover_loss,
             carbon_pools,
             simple_AGB_emissions,
             emissions_by_gas_annually,
@@ -277,20 +299,22 @@ class TreeCoverLossAnalysis(object):
         tcd = parameters[1].values
         tcd_year = parameters[2].value
         primary_forests = parameters[3].value
-        plantations = parameters[4].value
-        global_peat = parameters[5].value
-        tree_cover_loss_drivers = parameters[6].value
-        tree_cover_loss_from_fires = parameters[7].value
-        carbon_pools = parameters[8].value
-        simple_AGB_emissions = parameters[9].value
-        emissions_by_gas_annually = parameters[10].value
-        master_instance_type = parameters[11].value
-        worker_instance_type = parameters[12].value
-        worker_instance_count = parameters[13].value
-        jar_version = parameters[14].valueAsText
+        intact_forests = parameters[4].value
+        plantations = parameters[5].value
+        global_peat = parameters[6].value
+        tree_cover_loss_drivers = parameters[7].value
+        tree_cover_loss_from_fires = parameters[8].value
+        is__umd_tree_cover_loss = parameters[9].value
+        carbon_pools = parameters[10].value
+        simple_AGB_emissions = parameters[11].value
+        emissions_by_gas_annually = parameters[12].value
+        master_instance_type = parameters[13].value
+        worker_instance_type = parameters[14].value
+        worker_instance_count = parameters[15].value
+        jar_version = parameters[16].valueAsText
 
-        self.out_features_path = parameters[15].valueAsText
-        add_features_to_map = parameters[16].value
+        self.out_features_path = parameters[17].valueAsText
+        add_features_to_map = parameters[18].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -311,10 +335,12 @@ class TreeCoverLossAnalysis(object):
             tcd,
             tcd_year,
             primary_forests,
+            intact_forests,
             plantations,
             global_peat,
             tree_cover_loss_drivers,
             tree_cover_loss_from_fires,
+            is__umd_tree_cover_loss,
             carbon_pools,
             simple_AGB_emissions,
             emissions_by_gas_annually,
@@ -416,10 +442,12 @@ class TreeCoverLossAnalysis(object):
         tcd,
         tcd_year,
         primary_forests,
+        intact_forests,
         plantations,
         global_peat,
         tree_cover_loss_drivers,
         tree_cover_loss_from_fires,
+        is__umd_tree_cover_loss,
         carbon_pools,
         simple_AGB_emissions,
         emissions_by_gas_annually,
@@ -561,6 +589,10 @@ class TreeCoverLossAnalysis(object):
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__umd_regional_primary_forest_2001"]
             )
+        if intact_forests:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__intact_forest_landscapes_2000"]
+            )
         if plantations:
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__gfw_plantations"]
@@ -576,6 +608,10 @@ class TreeCoverLossAnalysis(object):
         if tree_cover_loss_from_fires:
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__tree_cover_loss_from_fires"]
+            )
+        if is__umd_tree_cover_loss:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "is__umd_tree_cover_loss"]
             )
 
         if carbon_pools:
@@ -641,10 +677,10 @@ class TreeCoverLossAnalysis(object):
 
         bootstrap_actions = [
             {
-                "Name": "Install GDAL 3.1.2 dependencies",
+                "Name": "Install GDAL 3.8.3 dependencies",
                 "ScriptBootstrapAction": {
-                    "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal.sh",
-                    "Args": ["3.1.2"],
+                    "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal-3.8.3.sh",
+                    "Args": ["3.8.3"],
                 },
             },
         ]
