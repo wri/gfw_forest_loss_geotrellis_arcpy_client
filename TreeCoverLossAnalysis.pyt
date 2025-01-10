@@ -34,7 +34,7 @@ class TreeCoverLossAnalysis(object):
         """Define the tool (tool name is the name of the class)."""
         self.label = "Tree Cover Loss Analysis"
         descript_1 = "Tree Cover Loss Analysis running on AWS EMR/Geotrellis. "
-        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain2000-2020=TRUE OR mangrove=TRUE NOT pre-2000 plantations). "
+        descript_2 = "Flux model results (emissions, removals, net) are for (TCD>X OR Hansen gain 2000-2020=TRUE OR mangrove=TRUE NOT pre-2000 plantations). "
         descript_3 = "Non-flux model results (total area, biomass stock/density, tree cover extent, gain and loss area) are for (TCD>X)."
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
