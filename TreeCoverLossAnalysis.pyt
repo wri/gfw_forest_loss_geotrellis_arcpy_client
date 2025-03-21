@@ -122,7 +122,7 @@ class TreeCoverLossAnalysis(object):
         global_peat.value = False
 
         tree_cover_loss_drivers = arcpy.Parameter(
-            displayName="DO NOT USE (may not work): Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2022)",
+            displayName="Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2023)",
             name="tree_cover_loss_drivers",
             datatype="GPBoolean",
             parameterType="Required",
