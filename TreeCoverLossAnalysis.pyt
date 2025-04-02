@@ -132,7 +132,7 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_drivers.value = False
 
         tree_cover_loss_from_fires = arcpy.Parameter(
-            displayName="Tree cover loss from fires (Tyukavina et al. 2022, updated through 2023-- not through 2024 yet!)",
+            displayName="Tree cover loss from fires (Tyukavina et al. 2022, updated through 2024)",
             name="tree_cover_loss_from fires",
             datatype="GPBoolean",
             parameterType="Required",
@@ -227,7 +227,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.4.16_ArcPy_TCL2024__no_other_updates"
+        jar_version.value = "2.4.16_ArcPy_TCL_TCLF2024_updated"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
