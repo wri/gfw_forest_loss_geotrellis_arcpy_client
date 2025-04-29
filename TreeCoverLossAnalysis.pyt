@@ -122,7 +122,7 @@ class TreeCoverLossAnalysis(object):
         global_peat.value = False
 
         tree_cover_loss_drivers = arcpy.Parameter(
-            displayName="Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2023)",
+            displayName="Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2024)",
             name="tree_cover_loss_drivers",
             datatype="GPBoolean",
             parameterType="Required",
@@ -142,7 +142,7 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_from_fires.value = False
 
         is__umd_tree_cover_loss = arcpy.Parameter(
-            displayName="Presence/absence of tree cover loss (through 2024)",
+            displayName="Presence/absence of tree cover loss (updated through 2024)",
             name="is__umd_tree_cover_loss",
             datatype="GPBoolean",
             parameterType="Required",
@@ -172,7 +172,7 @@ class TreeCoverLossAnalysis(object):
         simple_AGB_emissions.value = False
 
         emissions_by_gas_annually = arcpy.Parameter(
-            displayName="Output timeseries of emissions from CO2, CH4, and N2O separately (from Harris et al. 2021, updated through current year)",
+            displayName="Output timeseries of emissions from CO2, CH4, and N2O separately (from Harris et al. 2021, updated through 2024)",
             name="emissions_by_gas_annually",
             datatype="GPBoolean",
             parameterType="Required",
@@ -227,7 +227,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.4.16_ArcPy_TCL_TCLF2024_updated"
+        jar_version.value = "2.4.17_flux-model-v1-4-2-run"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
