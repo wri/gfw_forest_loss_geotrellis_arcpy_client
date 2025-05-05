@@ -227,7 +227,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.4.17_flux-model-v1-4-2-run"
+        jar_version.value = "2.4.16_ArcPy_flux_model_v1_4_2"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
