@@ -122,7 +122,7 @@ class TreeCoverLossAnalysis(object):
         global_peat.value = False
 
         tree_cover_loss_drivers = arcpy.Parameter(
-            displayName="Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2024)",
+            displayName="Driver of tree cover loss (1km model: Sims et al. 2025, with TCL through 2025)",
             name="tree_cover_loss_drivers",
             datatype="GPBoolean",
             parameterType="Required",
@@ -132,7 +132,7 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_drivers.value = False
 
         tree_cover_loss_from_fires = arcpy.Parameter(
-            displayName="Tree cover loss from fires (Tyukavina et al. 2022, updated through 2024)",
+            displayName="Tree cover loss from fires (Tyukavina et al. 2022, updated through 2025)",
             name="tree_cover_loss_from fires",
             datatype="GPBoolean",
             parameterType="Required",
@@ -142,7 +142,7 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_from_fires.value = False
 
         is__umd_tree_cover_loss = arcpy.Parameter(
-            displayName="Presence/absence of tree cover loss (updated through 2024)",
+            displayName="Presence/absence of tree cover loss (updated through 2025)",
             name="is__umd_tree_cover_loss",
             datatype="GPBoolean",
             parameterType="Required",
@@ -172,7 +172,7 @@ class TreeCoverLossAnalysis(object):
         simple_AGB_emissions.value = False
 
         emissions_by_gas_annually = arcpy.Parameter(
-            displayName="Output timeseries of emissions from CO2, CH4, and N2O separately (from Harris et al. 2021, updated through 2024)",
+            displayName="Output timeseries of emissions from CO2, CH4, and N2O separately (from Harris et al. 2021, updated through 2025)",
             name="emissions_by_gas_annually",
             datatype="GPBoolean",
             parameterType="Required",
