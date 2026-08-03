@@ -27,7 +27,7 @@ class TreeCoverLossAnalysis(object):
     s3_in_folder = "geotrellis/input_features"
     s3_out_folder = "geotrellis/results"
     s3_log_folder = "geotrellis/logs"
-    s3_bucket = "wri-users"
+    s3_bucket = "wri-lcl-users"
     sr = arcpy.SpatialReference(4326)
 
     def __init__(self):
@@ -529,18 +529,18 @@ class TreeCoverLossAnalysis(object):
                     },
                 },
             ],
-            "Ec2KeyName": "tmaschler_wri2",
+#             "Ec2KeyName": "tmaschler_wri2",
             "KeepJobFlowAliveWhenNoSteps": False,
             "TerminationProtected": False,
-            "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
-            "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
-            "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
-            "AdditionalMasterSecurityGroups": [
-                "sg-d7a0d8ad",
-                "sg-001e5f904c9cb7cc4",
-                "sg-6c6a5911",
-            ],
-            "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
+            "Ec2SubnetIds": ["subnet-05018eeb01bcd616e"],
+#             "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
+#             "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
+#             "AdditionalMasterSecurityGroups": [
+#                 "sg-d7a0d8ad",
+#                 "sg-001e5f904c9cb7cc4",
+#                 "sg-6c6a5911",
+#             ],
+#             "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
         }
 
         steps = [
@@ -555,7 +555,7 @@ class TreeCoverLossAnalysis(object):
                         "cluster",
                         "--class",
                         "org.globalforestwatch.summarystats.SummaryMain",
-                        "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(
+                        "s3://wri-lcl-users/geotrellis/jars/treecoverloss-assembly-{}.jar".format(
                             jar_version
                         ),
                         "treecoverloss",
@@ -679,7 +679,7 @@ class TreeCoverLossAnalysis(object):
             {
                 "Name": "Install GDAL 3.8.3 dependencies",
                 "ScriptBootstrapAction": {
-                    "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal-3.8.3.sh",
+                    "Path": "s3://wri-lcl-users/geotrellis/bootstrap/gdal-3.8.3.sh",
                     "Args": ["3.8.3"],
                 },
             },
@@ -697,8 +697,8 @@ class TreeCoverLossAnalysis(object):
             Configurations=configurations,
             BootstrapActions=bootstrap_actions,
             VisibleToAllUsers=True,
-            JobFlowRole="EMR_EC2_DefaultRole",
-            ServiceRole="EMR_DefaultRole",
+            JobFlowRole="AmazonEMR-InstanceProfile-20260803T135050",
+            ServiceRole="arn:aws:iam::058755926933:role/service-role/AmazonEMR-ServiceRole-20260803T135105",
             Tags=[
                 {"Key": "Project", "Value": "Global Forest Watch"},
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
