@@ -27,7 +27,7 @@ class TreeCoverLossAnalysis(object):
     s3_in_folder = "geotrellis/input_features"
     s3_out_folder = "geotrellis/results"
     s3_log_folder = "geotrellis/logs"
-    s3_bucket = "wri-users"
+    s3_bucket = "wri-lcl-users"
     sr = arcpy.SpatialReference(4326)
 
     def __init__(self):
@@ -151,6 +151,16 @@ class TreeCoverLossAnalysis(object):
         )
         is__umd_tree_cover_loss.value = False
 
+        gpw_cultivated_grassland_extent = arcpy.Parameter(
+            displayName=("Cultivated grassland extent (Parente et al. 2024, GPW v1.1, cultivated extent only, 2020-2024 only)"),
+            name="gpw_cultivated_grassland_extent",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Contextual layers: results by...",
+        )
+        gpw_cultivated_grassland_extent.value = False
+
         carbon_pools = arcpy.Parameter(
             displayName="Include aboveground, belowground, and soil carbon 2000 stock analyses",
             name="carbon_pools",
@@ -180,6 +190,16 @@ class TreeCoverLossAnalysis(object):
             category="Carbon options",
         )
         emissions_by_gas_annually.value = False
+
+        biomass_emissions_only = arcpy.Parameter(
+            displayName=("Output fluxes from non-soil carbon pools only (from Harris et al. 2021)"),
+            name="biomass_emissions_only",
+            datatype="GPBoolean",
+            parameterType="Required",
+            direction="Input",
+            category="Carbon options",
+        )
+        biomass_emissions_only.value = False
 
         master_instance_type = arcpy.Parameter(
             displayName="Master Instance Type",
@@ -227,7 +247,7 @@ class TreeCoverLossAnalysis(object):
             category="Spark config",
         )
 
-        jar_version.value = "2.6.18_ArcPy_2025_TCL_update_flux_model_v1_4_3"
+        jar_version.value = "2.6.23_ArcPy_2025_TCL_flux_model_v1_4_3_LEA_update"
 
         out_features = arcpy.Parameter(
             displayName="Out features",
@@ -261,9 +281,11 @@ class TreeCoverLossAnalysis(object):
             tree_cover_loss_drivers,
             tree_cover_loss_from_fires,
             is__umd_tree_cover_loss,
+            gpw_cultivated_grassland_extent,
             carbon_pools,
             simple_AGB_emissions,
             emissions_by_gas_annually,
+            biomass_emissions_only,
             master_instance_type,
             worker_instance_type,
             instance_count,
@@ -305,16 +327,20 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_drivers = parameters[7].value
         tree_cover_loss_from_fires = parameters[8].value
         is__umd_tree_cover_loss = parameters[9].value
-        carbon_pools = parameters[10].value
-        simple_AGB_emissions = parameters[11].value
-        emissions_by_gas_annually = parameters[12].value
-        master_instance_type = parameters[13].value
-        worker_instance_type = parameters[14].value
-        worker_instance_count = parameters[15].value
-        jar_version = parameters[16].valueAsText
+        gpw_cultivated_grassland_extent = parameters[10].value
 
-        self.out_features_path = parameters[17].valueAsText
-        add_features_to_map = parameters[18].value
+        carbon_pools = parameters[11].value
+        simple_AGB_emissions = parameters[12].value
+        emissions_by_gas_annually = parameters[13].value
+        biomass_emissions_only = parameters[14].value
+
+        master_instance_type = parameters[15].value
+        worker_instance_type = parameters[16].value
+        worker_instance_count = parameters[17].value
+        jar_version = parameters[18].valueAsText
+
+        self.out_features_path = parameters[19].valueAsText
+        add_features_to_map = parameters[20].value
 
         self.tsv_file = os.path.basename(self.out_features_path) + ".tsv"
         self.tsv_fullpath = os.path.join(self.tsv_path, self.tsv_file)
@@ -341,9 +367,11 @@ class TreeCoverLossAnalysis(object):
             tree_cover_loss_drivers,
             tree_cover_loss_from_fires,
             is__umd_tree_cover_loss,
+            gpw_cultivated_grassland_extent,
             carbon_pools,
             simple_AGB_emissions,
             emissions_by_gas_annually,
+            biomass_emissions_only,
             master_instance_type,
             worker_instance_type,
             worker_instance_count,
@@ -448,9 +476,11 @@ class TreeCoverLossAnalysis(object):
         tree_cover_loss_drivers,
         tree_cover_loss_from_fires,
         is__umd_tree_cover_loss,
+        gpw_cultivated_grassland_extent,
         carbon_pools,
         simple_AGB_emissions,
         emissions_by_gas_annually,
+        biomass_emissions_only,
         master_instance_type,
         worker_instance_type,
         worker_instance_count,
@@ -529,18 +559,18 @@ class TreeCoverLossAnalysis(object):
                     },
                 },
             ],
-            "Ec2KeyName": "tmaschler_wri2",
+#             "Ec2KeyName": "tmaschler_wri2",
             "KeepJobFlowAliveWhenNoSteps": False,
             "TerminationProtected": False,
-            "Ec2SubnetIds": ["subnet-08458452c1d05713b"],
-            "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
-            "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
-            "AdditionalMasterSecurityGroups": [
-                "sg-d7a0d8ad",
-                "sg-001e5f904c9cb7cc4",
-                "sg-6c6a5911",
-            ],
-            "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
+            "Ec2SubnetIds": ["subnet-05018eeb01bcd616e"],
+#             "EmrManagedMasterSecurityGroup": "sg-093d1007a79ed4f27",
+#             "EmrManagedSlaveSecurityGroup": "sg-04abaf6838e8a06fb",
+#             "AdditionalMasterSecurityGroups": [
+#                 "sg-d7a0d8ad",
+#                 "sg-001e5f904c9cb7cc4",
+#                 "sg-6c6a5911",
+#             ],
+#             "AdditionalSlaveSecurityGroups": ["sg-d7a0d8ad", "sg-6c6a5911"],
         }
 
         steps = [
@@ -555,7 +585,7 @@ class TreeCoverLossAnalysis(object):
                         "cluster",
                         "--class",
                         "org.globalforestwatch.summarystats.SummaryMain",
-                        "s3://gfw-pipelines/geotrellis/jars/treecoverloss-assembly-{}.jar".format(
+                        "s3://wri-lcl-users/geotrellis/jars/treecoverloss-assembly-{}.jar".format(
                             jar_version
                         ),
                         "treecoverloss",
@@ -613,6 +643,10 @@ class TreeCoverLossAnalysis(object):
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--contextual_layer", "is__umd_tree_cover_loss"]
             )
+        if gpw_cultivated_grassland_extent:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--contextual_layer", "gpw_cultivated_grassland_extent"]
+            )
 
         if carbon_pools:
             steps[0]["HadoopJarStep"]["Args"].extend(
@@ -625,6 +659,10 @@ class TreeCoverLossAnalysis(object):
         if emissions_by_gas_annually:
             steps[0]["HadoopJarStep"]["Args"].extend(
                 ["--emissions_by_gas_annually"]
+            )
+        if biomass_emissions_only:
+            steps[0]["HadoopJarStep"]["Args"].extend(
+                ["--biomass_emissions_only"]
             )
 
         applications = [{"Name": "Spark"}, {"Name": "Zeppelin"}, {"Name": "Ganglia"}]
@@ -679,7 +717,7 @@ class TreeCoverLossAnalysis(object):
             {
                 "Name": "Install GDAL 3.8.3 dependencies",
                 "ScriptBootstrapAction": {
-                    "Path": "s3://gfw-pipelines/geotrellis/bootstrap/gdal-3.8.3.sh",
+                    "Path": "s3://wri-lcl-users/geotrellis/bootstrap/gdal-3.8.3.sh",
                     "Args": ["3.8.3"],
                 },
             },
@@ -697,8 +735,8 @@ class TreeCoverLossAnalysis(object):
             Configurations=configurations,
             BootstrapActions=bootstrap_actions,
             VisibleToAllUsers=True,
-            JobFlowRole="EMR_EC2_DefaultRole",
-            ServiceRole="EMR_DefaultRole",
+            JobFlowRole="AmazonEMR-InstanceProfile-20260803T135050",
+            ServiceRole="arn:aws:iam::058755926933:role/service-role/AmazonEMR-ServiceRole-20260803T135105",
             Tags=[
                 {"Key": "Project", "Value": "Global Forest Watch"},
                 {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
