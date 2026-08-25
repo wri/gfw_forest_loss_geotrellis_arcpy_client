@@ -1,11 +1,179 @@
+"""
+ArcPy tool to run zonal statistics with AWS EMR using Geotrellis.
+
+Handling of AWS SSO credentials done in Claude session 'ArcPy AWS credentials management'.
+"""
+
 import arcpy
 import binascii
 import boto3
 from datetime import datetime
 import itertools
 import os
+from botocore.exceptions import BotoCoreError
+
+import hashlib
+import json
+import time
+import webbrowser
+import botocore.session
+
+### SSO login functions
+def _call_with_sso_login_retry(func, messages=None):
+    try:
+        result = func()
+        if messages is not None:
+            method = boto3.Session().get_credentials().method
+            messages.addMessage("AWS credentials found (source: {}).".format(method))
+        return result
+    except BotoCoreError:
+        profile = boto3.Session().profile_name
+        if messages is not None:
+            messages.addMessage("AWS SSO session expired. Logging in again...")
+        _sso_login(profile, messages)
+        result = func()
+        if messages is not None:
+            messages.addMessage("AWS credentials found after login.")
+        return result
 
 
+def _sso_cache_path(cache_key):
+    # This is the exact directory botocore's own SSO token loader reads
+    # from — writing here is what makes boto3's normal credential
+    # resolution pick up the token automatically, with no other config.
+    cache_dir = os.path.join(os.path.expanduser("~"), ".aws", "sso", "cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, "{}.json".format(cache_key))
+
+
+def _iso8601(epoch_seconds):
+    # botocore expects timestamps in the cache file as UTC ISO8601 strings
+    # ending in "Z" — not epoch numbers, and not localtime.
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch_seconds))
+
+
+def _get_sso_session_config(profile_name):
+    """Look up the [sso-session ...] block referenced by a profile."""
+    full_config = botocore.session.Session(profile=profile_name).full_config
+    profile_cfg = full_config.get("profiles", {}).get(profile_name, {})
+    session_name = profile_cfg.get("sso_session")
+    if not session_name:
+        raise RuntimeError(
+            "Profile '{}' has no sso_session configured.".format(profile_name)
+        )
+    sso_cfg = full_config.get("sso_sessions", {}).get(session_name, {})
+    start_url = sso_cfg.get("sso_start_url")
+    region = sso_cfg.get("sso_region")
+    scopes = sso_cfg.get("sso_registration_scopes", "sso:account:access")
+    if isinstance(scopes, str):
+        # Config parses this as a raw string ("sso:account:access") rather
+        # than a list; register_client() below requires an actual list.
+        scopes = [s.strip() for s in scopes.split(",") if s.strip()]
+    if not start_url or not region:
+        raise RuntimeError(
+            "sso-session '{}' is missing sso_start_url/sso_region.".format(session_name)
+        )
+    return session_name, start_url, region, scopes
+
+
+def _sso_login(profile_name, messages=None):
+    """Perform the AWS SSO device-authorization flow in-process (no
+    subprocess/external CLI) and cache the resulting token where boto3
+    already looks for it."""
+    session_name, start_url, region, scopes = _get_sso_session_config(profile_name)
+
+    # sso-oidc is the public, documented API behind `aws sso login` itself —
+    # calling it directly avoids shelling out to an external `aws` binary,
+    # which is what caused the Python-environment DLL collisions when
+    # invoked as a subprocess from inside ArcGIS's own conda environment.
+    oidc = boto3.client("sso-oidc", region_name=region)
+
+    # Registers this script as a throwaway OAuth client. clientType="public"
+    # means no client secret is needed to *use* the app (device-code flow),
+    # though sso-oidc still issues one here for signing the later calls.
+    client_info = oidc.register_client(
+        clientName="gfw-treecoverloss-toolbox",
+        clientType="public",
+        scopes=scopes,
+    )
+    client_id = client_info["clientId"]
+    client_secret = client_info["clientSecret"]
+
+    # Kicks off the OAuth device-authorization grant: AWS hands back a code
+    # tied to this login attempt, plus a URL the user approves it at.
+    device_auth = oidc.start_device_authorization(
+        clientId=client_id,
+        clientSecret=client_secret,
+        startUrl=start_url,
+    )
+
+    verification_uri = device_auth["verificationUriComplete"]
+    if messages is not None:
+        messages.addMessage(
+            "Opening browser to complete AWS SSO login: {}".format(verification_uri)
+        )
+    # webbrowser.open() just asks Windows to open a URL (like double-clicking
+    # a link) — unlike subprocess, it never spawns a competing Python
+    # interpreter, so it can't trigger the DLL-mismatch crash.
+    webbrowser.open(verification_uri)
+
+    interval = device_auth.get("interval", 5)
+    deadline = time.time() + device_auth.get("expiresIn", 600)
+
+    token_response = None
+    # Device-code flow requires polling — there's no callback/webhook. AWS
+    # tells us how often we're allowed to poll (interval) and how long the
+    # code stays valid (expiresIn); we must respect both.
+    while time.time() < deadline:
+        time.sleep(interval)
+        try:
+            token_response = oidc.create_token(
+                clientId=client_id,
+                clientSecret=client_secret,
+                grantType="urn:ietf:params:oauth:grant-type:device_code",
+                deviceCode=device_auth["deviceCode"],
+            )
+            break
+        except oidc.exceptions.AuthorizationPendingException:
+            # Normal/expected while the user hasn't clicked "Allow" yet.
+            continue
+        except oidc.exceptions.SlowDownException:
+            # AWS is telling us we're polling too fast; back off and retry.
+            interval += 5
+            continue
+        except (oidc.exceptions.AccessDeniedException, oidc.exceptions.ExpiredTokenException) as error:
+            # Terminal failures — no amount of continued polling will help.
+            raise RuntimeError("AWS SSO login was denied or timed out: {}".format(error))
+
+    if token_response is None:
+        raise RuntimeError("AWS SSO login timed out waiting for browser authorization.")
+
+    token_cache = {
+        "startUrl": start_url,
+        "region": region,
+        "accessToken": token_response["accessToken"],
+        "expiresAt": _iso8601(time.time() + token_response["expiresIn"]),
+        "clientId": client_id,
+        "clientSecret": client_secret,
+        "registrationExpiresAt": _iso8601(client_info["clientSecretExpiresAt"]),
+    }
+    if "refreshToken" in token_response:
+        token_cache["refreshToken"] = token_response["refreshToken"]
+
+    # botocore derives the cache filename by SHA1-hashing the sso-session
+    # NAME (e.g. "wri"), not the start URL — this only applies to profiles
+    # using the modern [sso-session ...] config style, which is what this
+    # profile uses. Verified against this exact setup: sha1("wri") matched
+    # an existing cache file botocore had already written itself.
+    cache_key = hashlib.sha1(session_name.encode("utf-8")).hexdigest()
+    with open(_sso_cache_path(cache_key), "w") as f:
+        json.dump(token_cache, f)
+
+    if messages is not None:
+        messages.addMessage("AWS SSO login complete.")
+
+
+### Analysis functions
 class Toolbox(object):
     def __init__(self):
         """Define the toolbox (the name of the toolbox is the name of the
@@ -39,7 +207,8 @@ class TreeCoverLossAnalysis(object):
         self.description = descript_1 + descript_2 + descript_3
         self.canRunInBackground = False
         self.aws_identity_label = (
-            boto3.client("sts").get_caller_identity().get("Arn").split("/")[-1].split("@")[0]
+            _call_with_sso_login_retry(boto3.client("sts").get_caller_identity)
+            .get("Arn").split("/")[-1].split("@")[0]
         )
         self.s3_in_features_prefix = "{}/{}".format(
             self.aws_identity_label, self.s3_in_folder
@@ -458,10 +627,13 @@ class TreeCoverLossAnalysis(object):
     def _upload_to_s3(self, messages):
         messages.addMessage("Upload to S3")
         s3 = boto3.resource("s3")
-        s3.meta.client.upload_file(
-            self.tsv_fullpath,
-            self.s3_bucket,
-            "{}/{}".format(self.s3_in_features_prefix, self.tsv_file),
+        _call_with_sso_login_retry(
+            lambda: s3.meta.client.upload_file(
+                self.tsv_fullpath,
+                self.s3_bucket,
+                "{}/{}".format(self.s3_in_features_prefix, self.tsv_file),
+            ),
+            messages,
         )
 
     def _launch_emr(
@@ -723,24 +895,27 @@ class TreeCoverLossAnalysis(object):
             },
         ]
 
-        response = client.run_job_flow(
-            Name="Geotrellis Forest Loss Analysis",
-            LogUri="s3://{}/{}/{}".format(
-                self.s3_bucket, self.aws_identity_label, self.s3_log_folder
-            ),
-            ReleaseLabel="emr-6.3.0",
-            Instances=instances,
-            Steps=steps,
-            Applications=applications,
-            Configurations=configurations,
-            BootstrapActions=bootstrap_actions,
-            VisibleToAllUsers=True,
-            JobFlowRole="AmazonEMR-InstanceProfile-20260803T135050",
-            ServiceRole="arn:aws:iam::058755926933:role/service-role/AmazonEMR-ServiceRole-20260803T135105",
-            Tags=[
-                {"Key": "Project", "Value": "Global Forest Watch"},
-                {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
-            ],
+        response = _call_with_sso_login_retry(
+            lambda: client.run_job_flow(
+                Name="Geotrellis Forest Loss Analysis",
+                LogUri="s3://{}/{}/{}".format(
+                    self.s3_bucket, self.aws_identity_label, self.s3_log_folder
+                ),
+                ReleaseLabel="emr-6.3.0",
+                Instances=instances,
+                Steps=steps,
+                Applications=applications,
+                Configurations=configurations,
+                BootstrapActions=bootstrap_actions,
+                VisibleToAllUsers=True,
+                JobFlowRole="AmazonEMR-InstanceProfile-20260803T135050",
+                ServiceRole="arn:aws:iam::058755926933:role/service-role/AmazonEMR-ServiceRole-20260803T135105",
+                Tags=[
+                    {"Key": "Project", "Value": "Global Forest Watch"},
+                    {"Key": "Job", "Value": "Tree Cover Loss Analysis"},
+                ],
+             ),
+             messages,
         )
 
         messages.addMessage(response)
